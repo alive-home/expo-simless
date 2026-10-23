@@ -9,7 +9,8 @@ import { expoModuleNames, resolveNativePackages } from "./nativePackages.ts"
 import type { RunnerConfig } from "./runner.ts"
 import { androidCacheDir, findSdk } from "./sdk.ts"
 
-const RUNNER = path.join(path.dirname(fileURLToPath(import.meta.url)), "runner.ts")
+// runner.ts beside the sources in a checkout, runner.js beside the compiled index.js in the published package.
+const RUNNER = fileURLToPath(new URL(`./runner${path.extname(fileURLToPath(import.meta.url))}`, import.meta.url))
 
 // How many emulators a run keeps up at once. Each takes about 2 GB of memory; renders beyond these wait their turn.
 const emulatorCount = () => Math.max(1, Number(process.env.SIMLESS_ANDROID_EMULATORS) || 2)

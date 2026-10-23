@@ -1,6 +1,6 @@
 {
 	"name": "@alivelabs/expo-simless",
-	"version": "0.1.0",
+	"version": "0.1.0-alpha.0",
 	"description": "Render the screens and components of an Expo app to PNGs, with no simulator.",
 	"license": "MIT",
 	"repository": {
@@ -8,7 +8,6 @@
 		"url": "git+https://github.com/alive-home/expo-simless.git",
 		"directory": "packages/expo-simless"
 	},
-	"private": true,
 	"type": "module",
 	"exports": {
 		".": {
@@ -21,8 +20,7 @@
 		"simless": "./bin/simless.js"
 	},
 	"files": [
-		"bin",
-		"src",
+		"dist",
 		"runtime",
 		"report",
 		"README.md"
@@ -31,7 +29,9 @@
 		"node": ">=23.6"
 	},
 	"scripts": {
-		"check": "tsc --noEmit -p ."
+		"build": "rm -rf dist && tsc -p tsconfig.build.json",
+		"check": "tsc --noEmit -p .",
+		"prepack": "pnpm run build"
 	},
 	"peerDependencies": {
 		"react-native": ">=0.88"
@@ -39,6 +39,22 @@
 	"peerDependenciesMeta": {
 		"react-native": {
 			"optional": true
+		}
+	},
+	"publishConfig": {
+		"access": "public",
+		"bin": {
+			"simless": "./dist/bin.js"
+		},
+		"exports": {
+			".": {
+				"types": "./runtime/index.d.ts",
+				"default": "./runtime/index.js"
+			},
+			"./renderer": {
+				"types": "./dist/renderer.d.ts",
+				"default": "./dist/renderer.js"
+			}
 		}
 	}
 }

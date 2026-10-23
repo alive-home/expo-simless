@@ -1,3 +1,4 @@
 node_modules/
 simless-output/
 *.tsbuildinfo
+dist/

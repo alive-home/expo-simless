@@ -1,6 +1,6 @@
 {
 	"name": "@alivelabs/expo-simless-macos",
-	"version": "0.1.0",
+	"version": "0.1.0-alpha.0",
 	"description": "The expo-simless renderer for iOS: draws with the iOS UIKit a Mac runs through Mac Catalyst.",
 	"license": "MIT",
 	"repository": {
@@ -8,13 +8,12 @@
 		"url": "git+https://github.com/alive-home/expo-simless.git",
 		"directory": "packages/macos"
 	},
-	"private": true,
 	"type": "module",
 	"exports": {
 		".": "./src/index.ts"
 	},
 	"files": [
-		"src",
+		"dist",
 		"ios",
 		"README.md"
 	],
@@ -25,12 +24,23 @@
 		"node": ">=23.6"
 	},
 	"scripts": {
-		"check": "tsc --noEmit -p ."
+		"build": "rm -rf dist && tsc -p tsconfig.build.json",
+		"check": "tsc --noEmit -p .",
+		"prepack": "pnpm run build"
 	},
 	"peerDependencies": {
-		"@alivelabs/expo-simless": "workspace:*"
+		"@alivelabs/expo-simless": "workspace:^"
 	},
 	"devDependencies": {
 		"@alivelabs/expo-simless": "workspace:*"
+	},
+	"publishConfig": {
+		"access": "public",
+		"exports": {
+			".": {
+				"types": "./dist/index.d.ts",
+				"default": "./dist/index.js"
+			}
+		}
 	}
 }

@@ -14,4 +14,13 @@ pnpm check     # typecheck every package
 pnpm lint      # biome
 ```
 
+In a checkout, and in an app that links one (`link:../expo-simless/packages/expo-simless`), Node runs the TypeScript
+sources as they are. The published packages carry JavaScript compiled into `dist/` instead, since Node does not strip
+types from files under `node_modules`; `publishConfig` points their `bin` and `exports` there. To release:
+
+```bash
+pnpm run ci
+pnpm -r publish --tag alpha   # builds each package first (prepack)
+```
+
 The documentation is in [packages/expo-simless/README.md](packages/expo-simless/README.md).

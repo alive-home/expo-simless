@@ -1,12 +1,4 @@
 #!/usr/bin/env node
-import { main } from "../src/cli.ts"
-
-main().then(
-	(code) => {
-		process.exitCode = code
-	},
-	(error) => {
-		process.stderr.write(`simless: ${error instanceof Error ? error.message : String(error)}\n`)
-		process.exitCode = 2
-	},
-)
+// The bin in a checkout (a workspace or `link:` dependency), where Node strips the types from the sources. The
+// published package runs dist/bin.js instead, compiled from the same file.
+import "../src/bin.ts"

@@ -59,7 +59,7 @@ Output
   nothing could be rendered (bad arguments, a failed build or bundle, a script that throws before its first render).
 
 Options
-  --platform <name>        ios (drawn by @alivelabs/expo-simless-macos) or android (not built yet). Default ios
+  --platform <name>        ios (drawn by @alivelabs/expo-simless-macos) or android (@alivelabs/expo-simless-android). Default ios
   --device <name,...>      Device preset(s) or WIDTHxHEIGHT@SCALE (default iphone-17-pro on ios; simless devices
                            lists them). This flag and --only take a comma-separated list, or repeat
   --appearance <mode>      light, dark or both (default light)
