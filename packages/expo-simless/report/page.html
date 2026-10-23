@@ -1,0 +1,569 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>__TITLE__ · simless report</title>
+<style>
+:root {
+	--bg: #ffffff;
+	--panel: #f5f5f7;
+	--text: #1d1d1f;
+	--muted: #6e6e73;
+	--line: #e5e5ea;
+	--accent: #0a66d6;
+	--bad: #d70015;
+	--warn: #b25000;
+	--frame: rgba(0, 0, 0, 0.12);
+	--zoom: 0.4;
+	color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+	:root {
+		--bg: #1c1c1e;
+		--panel: #2c2c2e;
+		--text: #f5f5f7;
+		--muted: #98989d;
+		--line: #3a3a3c;
+		--accent: #409cff;
+		--bad: #ff453a;
+		--warn: #ff9f0a;
+		--frame: rgba(255, 255, 255, 0.14);
+		color-scheme: dark;
+	}
+}
+* { box-sizing: border-box; }
+html { scroll-padding-top: 120px; }
+body { margin: 0; background: var(--bg); color: var(--text); font: 14px/1.45 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+button, input { font: inherit; color: inherit; }
+
+.top { position: sticky; top: 0; z-index: 5; background: var(--bg); border-bottom: 1px solid var(--line); }
+.summary { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 16px; padding: 14px 24px 6px; }
+.summary h1 { margin: 0; font-size: 17px; font-weight: 600; }
+.summary .meta { color: var(--muted); font-size: 13px; }
+.summary .counts { margin-left: auto; display: flex; gap: 14px; font-size: 13px; color: var(--muted); }
+.summary .counts b { color: var(--text); font-weight: 600; }
+.summary .counts .bad b { color: var(--bad); }
+.summary .counts .warn b { color: var(--warn); }
+.toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; padding: 6px 24px 12px; }
+.toolbar input[type="search"] {
+	width: 240px;
+	padding: 6px 10px;
+	border: 1px solid var(--line);
+	border-radius: 8px;
+	background: var(--panel);
+	outline: none;
+}
+.toolbar input[type="search"]:focus { border-color: var(--accent); }
+.group-label { color: var(--muted); font-size: 12px; margin-left: 6px; }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.chip {
+	padding: 4px 10px;
+	border: 1px solid var(--line);
+	border-radius: 999px;
+	background: transparent;
+	color: var(--muted);
+	font-size: 12px;
+	cursor: pointer;
+}
+.chip:hover { border-color: var(--muted); }
+.chip[aria-pressed="true"] {
+	background: color-mix(in srgb, var(--accent) 12%, transparent);
+	border-color: color-mix(in srgb, var(--accent) 35%, transparent);
+	color: var(--accent);
+}
+.chip.bad[aria-pressed="true"] {
+	background: color-mix(in srgb, var(--bad) 12%, transparent);
+	border-color: color-mix(in srgb, var(--bad) 35%, transparent);
+	color: var(--bad);
+}
+.zoom { margin-left: auto; display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--muted); }
+.zoom input { width: 120px; }
+.zoom output { width: 3em; color: var(--text); }
+
+.layout { display: grid; grid-template-columns: 220px minmax(0, 1fr); }
+nav {
+	position: sticky;
+	top: 100px;
+	align-self: start;
+	max-height: calc(100vh - 100px);
+	overflow: auto;
+	padding: 16px 12px 32px 24px;
+	font-size: 13px;
+}
+nav h4 { margin: 14px 0 4px; font-size: 11px; font-weight: 600; text-transform: uppercase; color: var(--muted); }
+nav a {
+	display: flex;
+	justify-content: space-between;
+	gap: 8px;
+	padding: 3px 8px;
+	margin: 0 -8px;
+	border-radius: 6px;
+	color: var(--text);
+	text-decoration: none;
+}
+nav a small { color: var(--muted); }
+nav a:hover { background: var(--panel); }
+nav a.active { background: var(--panel); font-weight: 600; }
+nav a.failing small { color: var(--bad); }
+
+main { padding: 0 24px 80px 8px; min-width: 0; }
+.errors { margin: 16px 0; padding: 12px 14px; border: 1px solid var(--bad); border-radius: 8px; color: var(--bad); white-space: pre-wrap; font: 12px/1.4 ui-monospace, Menlo, monospace; }
+section.group { padding-top: 20px; }
+.group-head { display: flex; align-items: baseline; gap: 10px; padding-bottom: 8px; border-bottom: 1px solid var(--line); }
+.group-head h2 { margin: 0; font-size: 20px; font-weight: 600; }
+.group-head .folder { color: var(--muted); font-size: 13px; }
+.group-head .count { margin-left: auto; color: var(--muted); font-size: 12px; }
+.render { padding: 16px 0 4px; }
+.render h3 { margin: 0 0 10px; font-size: 14px; font-weight: 600; }
+.strip { display: flex; flex-wrap: wrap; align-items: flex-start; gap: 20px 20px; padding: 2px 2px 12px; }
+figure { margin: 0; flex: none; }
+.plate { display: block; padding: 0; border: 0; background: none; cursor: zoom-in; border-radius: 4px; }
+.plate:focus-visible { outline: 2px solid var(--accent); outline-offset: 4px; }
+figure img {
+	display: block;
+	width: calc(var(--w) * var(--zoom) * 1px);
+	height: auto;
+	border-radius: calc(var(--r) * var(--zoom) * 1px);
+	box-shadow: 0 0 0 1px var(--frame);
+	background: var(--panel);
+}
+figure.fit img { border-radius: 6px; }
+.plate:hover img { box-shadow: 0 0 0 2px var(--accent); }
+figcaption { margin-top: 6px; font-size: 12px; color: var(--muted); }
+figcaption b { color: var(--text); font-weight: 500; }
+figcaption .warn { color: var(--warn); }
+.failed {
+	width: calc(var(--w) * var(--zoom) * 1px);
+	aspect-ratio: var(--aspect);
+	max-height: 70vh;
+	padding: 10px;
+	overflow: auto;
+	border: 1px solid var(--bad);
+	border-radius: 6px;
+	color: var(--bad);
+	white-space: pre-wrap;
+	word-break: break-word;
+	font: 11px/1.4 ui-monospace, Menlo, monospace;
+}
+.empty { padding: 80px 0; text-align: center; color: var(--muted); }
+.pair { display: flex; gap: 10px; align-items: flex-start; }
+.pair .side { display: flex; flex-direction: column; gap: 4px; }
+.pair .side span { font-size: 11px; color: var(--muted); }
+figcaption .changed { color: var(--accent); font-weight: 600; }
+
+.viewer { position: fixed; inset: 0; z-index: 20; display: grid; grid-template-rows: auto 1fr auto; background: rgba(0, 0, 0, 0.88); color: #f5f5f7; }
+.viewer[hidden] { display: none; }
+.viewer header { display: flex; align-items: baseline; gap: 12px; padding: 14px 20px; }
+.viewer header h2 { margin: 0; font-size: 16px; font-weight: 600; }
+.viewer header .where, .viewer header .counter { color: #98989d; font-size: 13px; }
+.viewer header .counter { margin-left: auto; }
+.viewer header .flip {
+	padding: 5px 12px;
+	border: 1px solid rgba(255, 255, 255, 0.24);
+	border-radius: 999px;
+	background: transparent;
+	color: #f5f5f7;
+	font-size: 12px;
+	cursor: pointer;
+}
+.viewer header .flip[aria-pressed="true"] { background: #f5f5f7; color: #1d1d1f; }
+.viewer .icon {
+	width: 34px;
+	height: 34px;
+	border-radius: 50%;
+	border: 0;
+	background: rgba(255, 255, 255, 0.14);
+	color: #fff;
+	font-size: 17px;
+	cursor: pointer;
+}
+.viewer .icon:hover { background: rgba(255, 255, 255, 0.24); }
+.viewer .stage { position: relative; display: grid; place-items: center; min-height: 0; padding: 0 70px; }
+.viewer .stage img { max-width: 100%; max-height: 100%; object-fit: contain; border-radius: var(--viewer-radius, 0); }
+.viewer .stage .failed { width: min(440px, 80vw); aspect-ratio: auto; background: rgba(0, 0, 0, 0.4); }
+.viewer .prev, .viewer .next { position: absolute; top: 50%; transform: translateY(-50%); }
+.viewer .prev { left: 18px; }
+.viewer .next { right: 18px; }
+.viewer footer { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px; padding: 12px 20px 18px; }
+.viewer footer button {
+	padding: 4px 10px;
+	border: 1px solid rgba(255, 255, 255, 0.2);
+	border-radius: 999px;
+	background: transparent;
+	color: #d1d1d6;
+	font-size: 12px;
+	cursor: pointer;
+}
+.viewer footer button[aria-current="true"] { background: #f5f5f7; border-color: #f5f5f7; color: #1d1d1f; }
+.viewer footer .detail { width: 100%; text-align: center; color: #98989d; font-size: 12px; }
+
+@media (max-width: 800px) {
+	.layout { grid-template-columns: 1fr; }
+	nav { display: none; }
+	main { padding: 0 16px 60px; }
+	.summary, .toolbar { padding-left: 16px; padding-right: 16px; }
+	.summary .counts, .zoom { margin-left: 0; }
+	.viewer .stage { padding: 0 12px; }
+	.viewer .prev, .viewer .next { display: none; }
+}
+</style>
+</head>
+<body>
+<div class="top">
+	<div class="summary">
+		<h1 id="title"></h1>
+		<span class="meta" id="meta"></span>
+		<span class="counts" id="counts"></span>
+	</div>
+	<div class="toolbar">
+		<input id="search" type="search" placeholder="Filter by name ( / )" autocomplete="off" spellcheck="false">
+		<span class="group-label">Devices</span>
+		<div class="chips" id="devices"></div>
+		<span class="group-label" id="appearances-label" hidden>Appearance</span>
+		<div class="chips" id="appearances"></div>
+		<button class="chip bad" id="failed" aria-pressed="false">Failed only</button>
+		<button class="chip" id="changed" aria-pressed="false" hidden>Changed only</button>
+		<button class="chip" id="before" aria-pressed="true" hidden>Before</button>
+		<label class="zoom">Size <input type="range" id="zoom" min="0.15" max="1" step="0.01"><output id="zoom-value"></output></label>
+	</div>
+</div>
+<div class="layout"><nav id="index"></nav><main id="sheet"></main></div>
+<div class="viewer" id="viewer" hidden>
+	<header>
+		<h2 id="viewer-title"></h2>
+		<span class="where" id="viewer-where"></span>
+		<span class="counter" id="viewer-counter"></span>
+		<button class="flip" id="viewer-flip" aria-pressed="false" hidden>Before (B)</button>
+		<button class="icon" id="viewer-close" aria-label="Close">×</button>
+	</header>
+	<div class="stage" id="viewer-stage">
+		<button class="icon prev" id="viewer-prev" aria-label="Previous">‹</button>
+		<button class="icon next" id="viewer-next" aria-label="Next">›</button>
+	</div>
+	<footer id="viewer-footer"></footer>
+</div>
+<script type="application/json" id="data">__REPORT_DATA__</script>
+<script>
+const report = JSON.parse(document.getElementById("data").textContent)
+const devices = new Map(report.devices.map((device) => [device.name, device]))
+const state = {
+	query: "",
+	hidden: new Set(),
+	appearances: new Set(report.appearances),
+	failedOnly: false,
+	changedOnly: false,
+	showBefore: true,
+}
+// Matches CHANGE_THRESHOLD in report.ts: less is a sub-pixel shift between runs.
+const CHANGE_THRESHOLD = 0.02
+const isChanged = (image) => image.change !== undefined && image.change >= CHANGE_THRESHOLD
+const percent = (fraction) => (fraction * 100).toFixed(fraction < 0.1 ? 1 : 0) + "%"
+const ZOOM_KEY = "simless-report-zoom"
+let visible = []
+let current = -1
+
+const el = (tag, props = {}, children = []) => {
+	const node = Object.assign(document.createElement(tag), props)
+	node.append(...children.filter((child) => child != null))
+	return node
+}
+const seconds = (ms) => (ms / 1000).toFixed(1) + " s"
+const lastPart = (name) => name.split("/").pop()
+const folderOf = (name) => (name.includes("/") ? name.slice(0, name.lastIndexOf("/")) : "")
+const plural = (count, word) => count + " " + word + (count === 1 ? "" : "s")
+
+// Summary
+document.getElementById("title").textContent = report.project
+const meta = []
+if (report.git) meta.push(report.git.branch + " @ " + report.git.commit + (report.git.dirty ? " (uncommitted changes)" : ""))
+meta.push(new Date(report.createdAt).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" }))
+meta.push("took " + Math.round(report.durationMs / 1000) + " s")
+if (report.compare) {
+	const against = report.compare.git ? report.compare.git.branch + " @ " + report.compare.git.commit : "an earlier report"
+	meta.push("compared with " + against)
+}
+document.getElementById("meta").textContent = meta.join(" · ")
+const renderCount = report.groups.reduce((total, group) => total + group.renders.length, 0)
+const counts = document.getElementById("counts")
+counts.append(
+	el("span", {}, [el("b", { textContent: renderCount }), " renders"]),
+	el("span", {}, [el("b", { textContent: report.summary.images }), " images"]),
+	el("span", { className: report.summary.failed ? "bad" : "" }, [el("b", { textContent: report.summary.failed }), " failed"]),
+)
+if (report.compare) {
+	counts.append(el("span", {}, [el("b", { textContent: report.compare.changed }), " changed"]))
+}
+if (report.summary.unsettled) {
+	counts.append(el("span", { className: "warn" }, [el("b", { textContent: report.summary.unsettled }), " still moving"]))
+}
+
+// Toolbar
+const toggle = (chip, on) => chip.setAttribute("aria-pressed", String(on))
+const deviceChips = document.getElementById("devices")
+for (const device of report.devices) {
+	const chip = el("button", { className: "chip", textContent: device.name, title: device.width + " × " + device.height + " pt @" + device.scale + "x" })
+	toggle(chip, true)
+	chip.onclick = () => {
+		state.hidden.has(device.name) ? state.hidden.delete(device.name) : state.hidden.add(device.name)
+		toggle(chip, !state.hidden.has(device.name))
+		draw()
+	}
+	deviceChips.append(chip)
+}
+if (report.appearances.length > 1) {
+	document.getElementById("appearances-label").hidden = false
+	const appearanceChips = document.getElementById("appearances")
+	for (const appearance of report.appearances) {
+		const chip = el("button", { className: "chip", textContent: appearance })
+		toggle(chip, true)
+		chip.onclick = () => {
+			state.appearances.has(appearance) ? state.appearances.delete(appearance) : state.appearances.add(appearance)
+			toggle(chip, state.appearances.has(appearance))
+			draw()
+		}
+		appearanceChips.append(chip)
+	}
+}
+const failedChip = document.getElementById("failed")
+failedChip.hidden = !report.summary.failed
+failedChip.onclick = () => {
+	state.failedOnly = !state.failedOnly
+	toggle(failedChip, state.failedOnly)
+	draw()
+}
+if (report.compare) {
+	const changedChip = document.getElementById("changed")
+	const beforeChip = document.getElementById("before")
+	changedChip.hidden = false
+	beforeChip.hidden = false
+	changedChip.onclick = () => {
+		state.changedOnly = !state.changedOnly
+		toggle(changedChip, state.changedOnly)
+		draw()
+	}
+	beforeChip.onclick = () => {
+		state.showBefore = !state.showBefore
+		toggle(beforeChip, state.showBefore)
+		draw()
+	}
+}
+const search = document.getElementById("search")
+// ?q=screens/Home opens the report filtered, so a link can point at one screen.
+const linked = new URLSearchParams(location.search).get("q")
+if (linked) {
+	search.value = linked
+	state.query = linked.trim().toLowerCase()
+}
+search.oninput = () => {
+	state.query = search.value.trim().toLowerCase()
+	draw()
+}
+const zoom = document.getElementById("zoom")
+const zoomValue = document.getElementById("zoom-value")
+const setZoom = (value) => {
+	document.documentElement.style.setProperty("--zoom", value)
+	zoom.value = value
+	zoomValue.textContent = Math.round(value * 100) + "%"
+}
+let savedZoom = null
+try { savedZoom = localStorage.getItem(ZOOM_KEY) } catch {}
+setZoom(Number(savedZoom) || 0.4)
+zoom.oninput = () => {
+	setZoom(Number(zoom.value))
+	try { localStorage.setItem(ZOOM_KEY, zoom.value) } catch {}
+}
+
+// One image: drawn at the device's size in points times the zoom, so devices keep their real proportions.
+const plate = (render, image, index) => {
+	const device = devices.get(image.device) || { width: 402, height: 874, scale: 3, cornerRadius: 0 }
+	const figure = el("figure")
+	figure.style.setProperty("--w", device.width)
+	figure.style.setProperty("--r", device.cornerRadius || 0)
+	figure.style.setProperty("--aspect", device.width + " / " + device.height)
+	const caption = el("figcaption")
+	caption.append(el("b", { textContent: image.device }))
+	if (report.appearances.length > 1) caption.append(" · " + image.appearance)
+	caption.append(el("br"), device.width + " × " + device.height + " · " + seconds(image.durationMs))
+	if (image.ok && !image.settled) caption.append(el("br"), el("span", { className: "warn", textContent: "Still moving at the timeout" }))
+	if (report.compare && image.ok) {
+		caption.append(el("br"), image.before === undefined
+			? "New"
+			: isChanged(image)
+				? el("span", { className: "changed", textContent: "Changed · " + percent(image.change) + " of pixels" })
+				: "Same")
+	}
+	if (!image.ok) {
+		figure.append(el("div", { className: "failed", textContent: image.error || "Failed" }), caption)
+		return figure
+	}
+	const img = el("img", { src: encodeURI(image.image), loading: "lazy", decoding: "async", alt: render + " on " + image.device })
+	// A component cropped to its content is shorter than the screen, and its corners are not the screen's.
+	img.onload = () => {
+		if (img.naturalHeight < device.height * device.scale - 2) figure.classList.add("fit")
+	}
+	const button = el("button", { className: "plate", title: "Open full size" }, [img])
+	button.onclick = () => open(index)
+	if (image.before && state.showBefore) {
+		const before = el("img", { src: encodeURI(image.before), loading: "lazy", decoding: "async", alt: render + " on " + image.device + ", before" })
+		before.onload = img.onload
+		const beforeButton = el("button", { className: "plate", title: "Open the earlier image" }, [before])
+		beforeButton.onclick = () => open(index, true)
+		figure.append(el("div", { className: "pair" }, [
+			el("div", { className: "side" }, [el("span", { textContent: "Before" }), beforeButton]),
+			el("div", { className: "side" }, [el("span", { textContent: "After" }), button]),
+		]), caption)
+		return figure
+	}
+	figure.append(button, caption)
+	return figure
+}
+
+const draw = () => {
+	const sheet = document.getElementById("sheet")
+	const index = document.getElementById("index")
+	sheet.replaceChildren()
+	index.replaceChildren()
+	visible = []
+	if (report.errors.length) {
+		sheet.append(el("div", { className: "errors", textContent: report.errors.map((error) => error.device + " " + error.appearance + ": " + error.error).join("\n\n") }))
+	}
+	const folders = new Map()
+	report.groups.forEach((group, number) => {
+		const folder = folderOf(group.name)
+		if (!folders.has(folder)) folders.set(folder, [])
+		folders.get(folder).push({ group, id: "g" + number })
+	})
+	for (const [folder, entries] of folders) {
+		const links = []
+		for (const { group, id } of entries) {
+			const section = el("section", { className: "group", id })
+			let shown = 0
+			let failing = 0
+			for (const render of group.renders) {
+				const full = group.name ? group.name + "/" + render.name : render.name
+				if (state.query && !full.toLowerCase().includes(state.query)) continue
+				const images = render.images.filter((image) =>
+					!state.hidden.has(image.device) &&
+					state.appearances.has(image.appearance) &&
+					(!state.failedOnly || !image.ok) &&
+					(!state.changedOnly || isChanged(image)))
+				if (!images.length) continue
+				shown += 1
+				failing += images.filter((image) => !image.ok).length
+				const strip = el("div", { className: "strip" })
+				for (const image of images) {
+					const at = visible.push({ group, render, image }) - 1
+					strip.append(plate(render.name, image, at))
+				}
+				section.append(el("div", { className: "render" }, [el("h3", { textContent: render.name }), strip]))
+			}
+			if (!shown) continue
+			section.prepend(el("div", { className: "group-head" }, [
+				el("h2", { textContent: lastPart(group.name) || "Renders" }),
+				folder ? el("span", { className: "folder", textContent: folder }) : null,
+				el("span", { className: "count", textContent: plural(shown, "render") }),
+			]))
+			sheet.append(section)
+			const link = el("a", { href: "#" + id }, [
+				el("span", { textContent: lastPart(group.name) || "Renders" }),
+				el("small", { textContent: failing ? failing + " failed" : String(shown) }),
+			])
+			if (failing) link.classList.add("failing")
+			link.dataset.target = id
+			links.push(link)
+		}
+		if (links.length) index.append(el("h4", { textContent: folder || "Renders" }), ...links)
+	}
+	if (!visible.length) sheet.append(el("p", { className: "empty", textContent: "No renders match." }))
+	watchSections()
+}
+
+// The index marks the section in view.
+let observer = null
+const watchSections = () => {
+	observer?.disconnect()
+	const links = new Map([...document.querySelectorAll("nav a")].map((link) => [link.dataset.target, link]))
+	observer = new IntersectionObserver((entries) => {
+		for (const entry of entries) {
+			if (!entry.isIntersecting) continue
+			for (const link of links.values()) link.classList.remove("active")
+			links.get(entry.target.id)?.classList.add("active")
+		}
+	}, { rootMargin: "-120px 0px -70% 0px" })
+	document.querySelectorAll("section.group").forEach((section) => observer.observe(section))
+}
+
+// Full size: arrows step through every image shown, the buttons below switch device for the same render.
+const viewer = document.getElementById("viewer")
+const stage = document.getElementById("viewer-stage")
+let viewingBefore = false
+const flip = document.getElementById("viewer-flip")
+const open = (index, before = viewingBefore) => {
+	current = index
+	const { group, render, image } = visible[index]
+	viewingBefore = Boolean(before && image.before)
+	flip.hidden = !image.before
+	toggle(flip, viewingBefore)
+	const device = devices.get(image.device)
+	document.getElementById("viewer-title").textContent = render.name
+	document.getElementById("viewer-where").textContent = group.name
+	document.getElementById("viewer-counter").textContent = (index + 1) + " of " + visible.length
+	stage.querySelector(".shown")?.remove()
+	let shown
+	if (image.ok) {
+		shown = el("img", { className: "shown", src: encodeURI(viewingBefore ? image.before : image.image), alt: render.name + " on " + image.device + (viewingBefore ? ", before" : "") })
+		shown.onload = () => {
+			const full = shown.naturalHeight >= device.height * device.scale - 2
+			const ratio = shown.getBoundingClientRect().width / device.width
+			shown.style.setProperty("--viewer-radius", full ? device.cornerRadius * ratio + "px" : "6px")
+		}
+	} else {
+		shown = el("div", { className: "failed shown", textContent: image.error || "Failed" })
+	}
+	stage.append(shown)
+	const footer = document.getElementById("viewer-footer")
+	footer.replaceChildren()
+	visible.forEach((entry, at) => {
+		if (entry.render !== render || entry.group !== group) return
+		const button = el("button", { textContent: entry.image.device + (report.appearances.length > 1 ? " " + entry.image.appearance : "") })
+		button.setAttribute("aria-current", String(at === index))
+		button.onclick = () => open(at)
+		footer.append(button)
+	})
+	const change = image.before === undefined ? "" : " · " + (isChanged(image) ? "changed, " + percent(image.change) + " of pixels" : "same as before")
+	footer.append(el("div", { className: "detail", textContent: device.width + " × " + device.height + " pt @" + device.scale + "x · " + seconds(image.durationMs) + change + " · " + (viewingBefore ? image.before : image.image) }))
+	if (viewer.hidden) {
+		viewer.hidden = false
+		document.body.style.overflow = "hidden"
+	}
+}
+const close = () => {
+	viewer.hidden = true
+	document.body.style.overflow = ""
+}
+document.getElementById("viewer-close").onclick = close
+flip.onclick = () => open(current, !viewingBefore)
+document.getElementById("viewer-prev").onclick = () => current > 0 && open(current - 1)
+document.getElementById("viewer-next").onclick = () => current < visible.length - 1 && open(current + 1)
+stage.onclick = (event) => {
+	if (event.target === stage) close()
+}
+document.addEventListener("keydown", (event) => {
+	if (!viewer.hidden) {
+		if (event.key === "Escape") close()
+		if (event.key === "ArrowRight" && current < visible.length - 1) open(current + 1)
+		if (event.key === "ArrowLeft" && current > 0) open(current - 1)
+		if ((event.key === "b" || event.key === "B") && !flip.hidden) open(current, !viewingBefore)
+		return
+	}
+	if (event.key === "/" && document.activeElement !== search) {
+		event.preventDefault()
+		search.focus()
+	}
+})
+
+draw()
+</script>
+</body>
+</html>
