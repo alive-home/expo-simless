@@ -1,0 +1,45 @@
+// The JSI half of the host, in a library of its own: the app module keeps React Native's default native build
+// (libappmodules, which registers the autolinked C++ modules and Fabric components), which a CMake project of the
+// app's own would replace.
+apply plugin: "com.android.library"
+apply plugin: "org.jetbrains.kotlin.android"
+
+android {
+  namespace "dev.simless.bindings"
+  compileSdk rootProject.ext.compileSdkVersion
+  ndkVersion rootProject.ext.ndkVersion
+
+  defaultConfig {
+    minSdkVersion rootProject.ext.minSdkVersion
+    externalNativeBuild {
+      cmake {
+        arguments "-DANDROID_STL=c++_shared"
+        def architectures = findProperty("reactNativeArchitectures")
+        if (architectures) {
+          abiFilters(*architectures.split(",").collect { it.trim() })
+        }
+      }
+    }
+  }
+
+  externalNativeBuild {
+    cmake {
+      path "src/main/cpp/CMakeLists.txt"
+    }
+  }
+
+  buildFeatures {
+    prefab true
+  }
+
+  // React Native ships these; one copy each in the APK.
+  packaging {
+    jniLibs {
+      excludes += ["**/libc++_shared.so", "**/libfbjni.so", "**/libjsi.so", "**/libreactnative.so"]
+    }
+  }
+}
+
+dependencies {
+  implementation("com.facebook.react:react-android")
+}

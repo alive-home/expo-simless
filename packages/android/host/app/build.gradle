@@ -1,0 +1,40 @@
+apply plugin: "com.android.application"
+apply plugin: "org.jetbrains.kotlin.android"
+apply plugin: "com.facebook.react"
+
+def projectRoot = new File("__PROJECT_ROOT__")
+def resolveFromProject = { String expression ->
+  ["node", "--print", expression].execute(null, projectRoot).text.trim()
+}
+
+react {
+  root = projectRoot
+  reactNativeDir = new File(resolveFromProject("require.resolve('react-native/package.json')")).getParentFile().getAbsoluteFile()
+  codegenDir = new File(resolveFromProject("require.resolve('@react-native/codegen/package.json', { paths: [require.resolve('react-native/package.json')] })")).getParentFile().getAbsoluteFile()
+  // The bundle comes from simless at run time, so no variant bundles one at build time.
+  debuggableVariants = ["debug"]
+  autolinkLibrariesWithApp()
+}
+
+android {
+  ndkVersion rootProject.ext.ndkVersion
+  buildToolsVersion rootProject.ext.buildToolsVersion
+  compileSdk rootProject.ext.compileSdkVersion
+
+  namespace "dev.simless.host"
+  defaultConfig {
+    applicationId "dev.simless.host"
+    minSdkVersion rootProject.ext.minSdkVersion
+    targetSdkVersion rootProject.ext.targetSdkVersion
+    versionCode 1
+    versionName "1.0"
+  }
+}
+
+dependencies {
+  implementation("com.facebook.react:react-android")
+  implementation("com.facebook.react:hermes-android")
+  implementation(project(":bindings"))
+  implementation("com.facebook.fresco:animated-gif:${expoLibs.versions.fresco.get()}")
+  implementation("com.facebook.fresco:webpsupport:${expoLibs.versions.fresco.get()}")
+}

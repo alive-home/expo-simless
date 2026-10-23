@@ -1,0 +1,24 @@
+{
+	"name": "@expo-simless/android",
+	"version": "0.1.0",
+	"description": "The expo-simless renderer for Android: draws with Android's own views on an emulator booted from a snapshot.",
+	"private": true,
+	"type": "module",
+	"exports": {
+		".": "./src/index.ts"
+	},
+	"files": [
+		"src",
+		"host",
+		"README.md"
+	],
+	"scripts": {
+		"check": "tsc --noEmit -p ."
+	},
+	"peerDependencies": {
+		"expo-simless": "workspace:*"
+	},
+	"devDependencies": {
+		"expo-simless": "workspace:*"
+	}
+}
