@@ -73,6 +73,23 @@ const matches = (name: string, pattern: string) =>
 const isWanted = (name: string, only: string[] | null) =>
 	only === null || only.some((pattern) => matches(name, pattern))
 
+// Where the host writes a render's PNG: the plan's template, whose `{name}` it replaces with the render's name.
+const outputTemplate = (script: ScriptRun, { device, appearance }: Variant) =>
+	path.join(script.outDir, `{name}-${safe(device.name)}-${appearance}.png`)
+
+// A render whose process ended before reporting it (the host exited, or the script stopped before reaching it): failed,
+// rather than missing from the totals and the exit code.
+const unreported = (script: ScriptRun, variant: Variant, name: string, index: number, error: string): JobResult => ({
+	id: String(index),
+	name,
+	output: outputTemplate(script, variant).replace("{name}", name),
+	ok: false,
+	settled: false,
+	durationMs: 0,
+	logs: [],
+	error,
+})
+
 let processCount = 0
 
 const runProcess = async (script: ScriptRun, variant: Variant, selection: Selection): Promise<ProcessResult> => {
@@ -90,7 +107,7 @@ const runProcess = async (script: ScriptRun, variant: Variant, selection: Select
 			locale: script.locale,
 			selection: JSON.stringify(selection),
 			template: {
-				output: path.join(script.outDir, `{name}-${safe(device.name)}-${appearance}.png`),
+				output: outputTemplate(script, variant),
 				width: device.width,
 				height: device.height,
 				scale: device.scale,
@@ -149,6 +166,8 @@ export const runScript = async (script: ScriptRun, variants: Variant[]): Promise
 			names = result.names
 		}
 	}
+	// Variants whose first process ended before it listed the script's renders, so none of theirs were performed.
+	const unlisted: Array<{ variant: Variant; error: string }> = []
 	const workers = Math.max(1, Math.floor(os.availableParallelism() / 2))
 	const queue: Array<() => Promise<void>> = []
 	const startVariant = (variant: Variant) => async () => {
@@ -160,6 +179,10 @@ export const runScript = async (script: ScriptRun, variants: Variant[]): Promise
 			return
 		}
 		const first = await runProcess(script, variant, { group: null, indices: null, patterns: script.only, limit: 1 })
+		if (first.names.length === 0 && first.error) {
+			unlisted.push({ variant, error: first.error })
+			return
+		}
 		record(variant, first)
 		const done = new Set(first.jobs.map((job) => Number(job.id)))
 		const seenInGroup = new Map<string, number>()
@@ -176,6 +199,11 @@ export const runScript = async (script: ScriptRun, variants: Variant[]): Promise
 						patterns: null,
 						limit: 1,
 					})
+					if (result.jobs.length === 0) {
+						const error = result.error ?? first.error ?? "the host did not report this render"
+						record(variant, { ...result, jobs: [unreported(script, variant, name, index, error)], error: undefined })
+						return
+					}
 					// A script error in a process that only replays the run up to its render repeats the first one's.
 					record(variant, first.error ? { ...result, error: undefined } : result)
 				})
@@ -202,6 +230,16 @@ export const runScript = async (script: ScriptRun, variants: Variant[]): Promise
 		}
 		next()
 	})
+	// Another variant's first process named the renders: on this one they all failed with its error. With no names at
+	// all (every variant stopped), the script error stands alone.
+	for (const { variant, error } of unlisted) {
+		const wanted = names.map((name, index) => ({ name, index })).filter(({ name }) => isWanted(name, script.only))
+		record(variant, {
+			names: [],
+			error: wanted.length === 0 ? error : undefined,
+			jobs: wanted.map(({ name, index }) => unreported(script, variant, name, index, error)),
+		})
+	}
 	const order = (outcome: RenderOutcome) => names.indexOf(outcome.name)
 	const variantOrder = (outcome: { device: string; appearance: Appearance }) =>
 		variants.findIndex((variant) => variant.device.name === outcome.device && variant.appearance === outcome.appearance)
