@@ -1,0 +1,30 @@
+{
+	"name": "@expo-simless/macos",
+	"version": "0.1.0",
+	"description": "The expo-simless renderer for iOS: draws with the iOS UIKit a Mac runs through Mac Catalyst.",
+	"private": true,
+	"type": "module",
+	"exports": {
+		".": "./src/index.ts"
+	},
+	"files": [
+		"src",
+		"ios",
+		"README.md"
+	],
+	"os": [
+		"darwin"
+	],
+	"engines": {
+		"node": ">=23.6"
+	},
+	"scripts": {
+		"check": "tsc --noEmit -p ."
+	},
+	"peerDependencies": {
+		"expo-simless": "workspace:*"
+	},
+	"devDependencies": {
+		"expo-simless": "workspace:*"
+	}
+}
