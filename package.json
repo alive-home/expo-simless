@@ -1,0 +1,16 @@
+{
+	"name": "expo-simless-workspace",
+	"private": true,
+	"type": "module",
+	"packageManager": "pnpm@12.9.1",
+	"scripts": {
+		"check": "pnpm -r check",
+		"lint": "biome check --write .",
+		"ci": "biome ci . && pnpm -r check"
+	},
+	"devDependencies": {
+		"@biomejs/biome": "2.6.2",
+		"@types/node": "26.6.5",
+		"typescript": "6.0.3"
+	}
+}
