@@ -2,6 +2,12 @@
 	"name": "@expo-simless/macos",
 	"version": "0.1.0",
 	"description": "The expo-simless renderer for iOS: draws with the iOS UIKit a Mac runs through Mac Catalyst.",
+	"license": "MIT",
+	"repository": {
+		"type": "git",
+		"url": "git+https://github.com/alive-home/expo-simless.git",
+		"directory": "packages/macos"
+	},
 	"private": true,
 	"type": "module",
 	"exports": {

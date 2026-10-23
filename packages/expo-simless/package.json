@@ -2,6 +2,12 @@
 	"name": "expo-simless",
 	"version": "0.1.0",
 	"description": "Render the screens and components of an Expo app to PNGs, with no simulator.",
+	"license": "MIT",
+	"repository": {
+		"type": "git",
+		"url": "git+https://github.com/alive-home/expo-simless.git",
+		"directory": "packages/expo-simless"
+	},
 	"private": true,
 	"type": "module",
 	"exports": {
