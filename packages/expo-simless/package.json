@@ -1,6 +1,6 @@
 {
 	"name": "@alivelabs/expo-simless",
-	"version": "0.1.0-alpha.0",
+	"version": "0.1.0-alpha.1",
 	"description": "Render the screens and components of an Expo app to PNGs, with no simulator.",
 	"license": "MIT",
 	"repository": {
