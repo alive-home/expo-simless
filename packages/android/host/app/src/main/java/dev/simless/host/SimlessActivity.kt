@@ -44,6 +44,24 @@ private const val TAG = "Simless"
 private const val ANIMATING_GRACE_MS = 2000L
 private const val POLL_MS = 16L
 
+// The threads image libraries decode on: Glide's (expo-image) and Fresco's (React Native's Image). Nothing draws
+// while they work, so a large image would land after a quiet window had already ended; one of them running counts
+// as drawing. Idle, they wait on their queues.
+private val IMAGE_THREAD_PREFIXES = listOf("glide-", "Fresco")
+
+private fun imagesDecoding(): Boolean {
+  var group = Thread.currentThread().threadGroup
+  while (group?.parent != null) {
+    group = group.parent
+  }
+  val threads = arrayOfNulls<Thread>((group?.activeCount() ?: 0) * 2 + 16)
+  val count = group?.enumerate(threads, true) ?: 0
+  return (0 until count).any { index ->
+    val thread = threads[index] ?: return@any false
+    thread.state == Thread.State.RUNNABLE && IMAGE_THREAD_PREFIXES.any { thread.name.startsWith(it) }
+  }
+}
+
 // Runs a plan: the bundle is the script, and it asks for each render with __simless.mount(). The same contract as
 // ios/react-native/SMLReactHost.mm in @alivelabs/expo-simless-macos; the runner on the Mac pushes the plan and pulls the PNGs.
 // A ReactActivity behind Expo's delegate wrapper, as an Expo app's MainActivity is: React Native sets the window up
@@ -194,8 +212,8 @@ class SimlessActivity : ReactActivity(), SimlessBridgeHandler {
     waitUntilSettled(running) { settled -> capture(running, settled) }
   }
 
-  // Settled once nothing has drawn for the job's settle time; Android draws only what invalidates, so a quiet
-  // window is a finished one.
+  // Settled once nothing has drawn, and no image has been decoding, for the job's settle time; Android draws only
+  // what invalidates, so a quiet window is a finished one.
   private fun waitUntilSettled(running: Running, completion: (Boolean) -> Unit) {
     val start = SystemClock.uptimeMillis()
     val job = running.job
@@ -206,6 +224,9 @@ class SimlessActivity : ReactActivity(), SimlessBridgeHandler {
             return
           }
           val now = SystemClock.uptimeMillis()
+          if (imagesDecoding()) {
+            lastDraw = now
+          }
           when {
             now - lastDraw >= job.settleMs -> completion(true)
             now - start >= job.settleMs + ANIMATING_GRACE_MS -> completion(true)
