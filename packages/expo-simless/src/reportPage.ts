@@ -13,4 +13,4 @@ export const reportPage = (report: Report): string =>
 	fs
 		.readFileSync(TEMPLATE, "utf8")
 		.replace("__TITLE__", () => escapeHtml(report.project))
-		.replace("__REPORT_DATA__", () => JSON.stringify(report).replaceAll("<", "\\u003c"))
+		.replace('"__REPORT_DATA__"', () => JSON.stringify(report).replaceAll("<", "\\u003c"))

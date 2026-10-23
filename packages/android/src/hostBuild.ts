@@ -154,12 +154,7 @@ export const ensureHostApk = async (
 	const fingerprint = await nativeFingerprint(project.root)
 	const template = templateFiles().map((file) => [file, fs.readFileSync(path.join(TEMPLATE, file))] as const)
 	for (let attempt = 1; ; attempt += 1) {
-		const key = hashOf([
-			fingerprint,
-			sdk.abi,
-			JSON.stringify(exclude),
-			...template.flatMap(([file, data]) => [file, data]),
-		])
+		const key = hashOf([fingerprint, sdk.abi, JSON.stringify(exclude), ...template.flat()])
 		const apk = path.join(cacheRoot(), "android", `SimlessHost-${key}.apk`)
 		if (fs.existsSync(apk)) {
 			return { apk, key, exclude }

@@ -131,6 +131,7 @@ figure img {
 figure.fit img { border-radius: 6px; }
 .plate:hover img { box-shadow: 0 0 0 2px var(--accent); }
 figcaption { margin-top: 6px; font-size: 12px; color: var(--muted); }
+/* biome-ignore lint/style/noDescendingSpecificity: a caption's <b>, never one inside .summary .counts */
 figcaption b { color: var(--text); font-weight: 500; }
 figcaption .warn { color: var(--warn); }
 .failed {
@@ -212,7 +213,7 @@ figcaption .changed { color: var(--accent); font-weight: 600; }
 <body>
 <div class="top">
 	<div class="summary">
-		<h1 id="title"></h1>
+		<h1 id="title">simless report</h1>
 		<span class="meta" id="meta"></span>
 		<span class="counts" id="counts"></span>
 	</div>
@@ -222,28 +223,28 @@ figcaption .changed { color: var(--accent); font-weight: 600; }
 		<div class="chips" id="devices"></div>
 		<span class="group-label" id="appearances-label" hidden>Appearance</span>
 		<div class="chips" id="appearances"></div>
-		<button class="chip bad" id="failed" aria-pressed="false">Failed only</button>
-		<button class="chip" id="changed" aria-pressed="false" hidden>Changed only</button>
-		<button class="chip" id="before" aria-pressed="true" hidden>Before</button>
+		<button type="button" class="chip bad" id="failed" aria-pressed="false">Failed only</button>
+		<button type="button" class="chip" id="changed" aria-pressed="false" hidden>Changed only</button>
+		<button type="button" class="chip" id="before" aria-pressed="true" hidden>Before</button>
 		<label class="zoom">Size <input type="range" id="zoom" min="0.15" max="1" step="0.01"><output id="zoom-value"></output></label>
 	</div>
 </div>
 <div class="layout"><nav id="index"></nav><main id="sheet"></main></div>
 <div class="viewer" id="viewer" hidden>
 	<header>
-		<h2 id="viewer-title"></h2>
+		<h2 id="viewer-title">Render</h2>
 		<span class="where" id="viewer-where"></span>
 		<span class="counter" id="viewer-counter"></span>
-		<button class="flip" id="viewer-flip" aria-pressed="false" hidden>Before (B)</button>
-		<button class="icon" id="viewer-close" aria-label="Close">×</button>
+		<button type="button" class="flip" id="viewer-flip" aria-pressed="false" hidden>Before (B)</button>
+		<button type="button" class="icon" id="viewer-close" aria-label="Close">×</button>
 	</header>
 	<div class="stage" id="viewer-stage">
-		<button class="icon prev" id="viewer-prev" aria-label="Previous">‹</button>
-		<button class="icon next" id="viewer-next" aria-label="Next">›</button>
+		<button type="button" class="icon prev" id="viewer-prev" aria-label="Previous">‹</button>
+		<button type="button" class="icon next" id="viewer-next" aria-label="Next">›</button>
 	</div>
 	<footer id="viewer-footer"></footer>
 </div>
-<script type="application/json" id="data">__REPORT_DATA__</script>
+<script type="application/json" id="data">"__REPORT_DATA__"</script>
 <script>
 const report = JSON.parse(document.getElementById("data").textContent)
 const devices = new Map(report.devices.map((device) => [device.name, device]))
@@ -258,7 +259,7 @@ const state = {
 // Matches CHANGE_THRESHOLD in report.ts: less is a sub-pixel shift between runs.
 const CHANGE_THRESHOLD = 0.02
 const isChanged = (image) => image.change !== undefined && image.change >= CHANGE_THRESHOLD
-const percent = (fraction) => (fraction * 100).toFixed(fraction < 0.1 ? 1 : 0) + "%"
+const percent = (fraction) => `${(fraction * 100).toFixed(fraction < 0.1 ? 1 : 0)}%`
 const ZOOM_KEY = "simless-report-zoom"
 let visible = []
 let current = -1
@@ -268,20 +269,20 @@ const el = (tag, props = {}, children = []) => {
 	node.append(...children.filter((child) => child != null))
 	return node
 }
-const seconds = (ms) => (ms / 1000).toFixed(1) + " s"
+const seconds = (ms) => `${(ms / 1000).toFixed(1)} s`
 const lastPart = (name) => name.split("/").pop()
 const folderOf = (name) => (name.includes("/") ? name.slice(0, name.lastIndexOf("/")) : "")
-const plural = (count, word) => count + " " + word + (count === 1 ? "" : "s")
+const plural = (count, word) => `${count} ${word}${count === 1 ? "" : "s"}`
 
 // Summary
 document.getElementById("title").textContent = report.project
 const meta = []
-if (report.git) meta.push(report.git.branch + " @ " + report.git.commit + (report.git.dirty ? " (uncommitted changes)" : ""))
+if (report.git) { meta.push(`${report.git.branch} @ ${report.git.commit}${report.git.dirty ? " (uncommitted changes)" : ""}`) }
 meta.push(new Date(report.createdAt).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" }))
-meta.push("took " + Math.round(report.durationMs / 1000) + " s")
+meta.push(`took ${Math.round(report.durationMs / 1000)} s`)
 if (report.compare) {
-	const against = report.compare.git ? report.compare.git.branch + " @ " + report.compare.git.commit : "an earlier report"
-	meta.push("compared with " + against)
+	const against = report.compare.git ? `${report.compare.git.branch} @ ${report.compare.git.commit}` : "an earlier report"
+	meta.push(`compared with ${against}`)
 }
 document.getElementById("meta").textContent = meta.join(" · ")
 const renderCount = report.groups.reduce((total, group) => total + group.renders.length, 0)
@@ -302,7 +303,7 @@ if (report.summary.unsettled) {
 const toggle = (chip, on) => chip.setAttribute("aria-pressed", String(on))
 const deviceChips = document.getElementById("devices")
 for (const device of report.devices) {
-	const chip = el("button", { className: "chip", textContent: device.name, title: device.width + " × " + device.height + " pt @" + device.scale + "x" })
+	const chip = el("button", { className: "chip", textContent: device.name, title: `${device.width} × ${device.height} pt @${device.scale}x` })
 	toggle(chip, true)
 	chip.onclick = () => {
 		state.hidden.has(device.name) ? state.hidden.delete(device.name) : state.hidden.add(device.name)
@@ -364,7 +365,7 @@ const zoomValue = document.getElementById("zoom-value")
 const setZoom = (value) => {
 	document.documentElement.style.setProperty("--zoom", value)
 	zoom.value = value
-	zoomValue.textContent = Math.round(value * 100) + "%"
+	zoomValue.textContent = `${Math.round(value * 100)}%`
 }
 let savedZoom = null
 try { savedZoom = localStorage.getItem(ZOOM_KEY) } catch {}
@@ -380,32 +381,32 @@ const plate = (render, image, index) => {
 	const figure = el("figure")
 	figure.style.setProperty("--w", device.width)
 	figure.style.setProperty("--r", device.cornerRadius || 0)
-	figure.style.setProperty("--aspect", device.width + " / " + device.height)
+	figure.style.setProperty("--aspect", `${device.width} / ${device.height}`)
 	const caption = el("figcaption")
 	caption.append(el("b", { textContent: image.device }))
-	if (report.appearances.length > 1) caption.append(" · " + image.appearance)
-	caption.append(el("br"), device.width + " × " + device.height + " · " + seconds(image.durationMs))
-	if (image.ok && !image.settled) caption.append(el("br"), el("span", { className: "warn", textContent: "Still moving at the timeout" }))
+	if (report.appearances.length > 1) { caption.append(` · ${image.appearance}`) }
+	caption.append(el("br"), `${device.width} × ${device.height} · ${seconds(image.durationMs)}`)
+	if (image.ok && !image.settled) { caption.append(el("br"), el("span", { className: "warn", textContent: "Still moving at the timeout" })) }
 	if (report.compare && image.ok) {
 		caption.append(el("br"), image.before === undefined
 			? "New"
 			: isChanged(image)
-				? el("span", { className: "changed", textContent: "Changed · " + percent(image.change) + " of pixels" })
+				? el("span", { className: "changed", textContent: `Changed · ${percent(image.change)} of pixels` })
 				: "Same")
 	}
 	if (!image.ok) {
 		figure.append(el("div", { className: "failed", textContent: image.error || "Failed" }), caption)
 		return figure
 	}
-	const img = el("img", { src: encodeURI(image.image), loading: "lazy", decoding: "async", alt: render + " on " + image.device })
+	const img = el("img", { src: encodeURI(image.image), loading: "lazy", decoding: "async", alt: `${render} on ${image.device}` })
 	// A component cropped to its content is shorter than the screen, and its corners are not the screen's.
 	img.onload = () => {
-		if (img.naturalHeight < device.height * device.scale - 2) figure.classList.add("fit")
+		if (img.naturalHeight < device.height * device.scale - 2) { figure.classList.add("fit") }
 	}
 	const button = el("button", { className: "plate", title: "Open full size" }, [img])
 	button.onclick = () => open(index)
 	if (image.before && state.showBefore) {
-		const before = el("img", { src: encodeURI(image.before), loading: "lazy", decoding: "async", alt: render + " on " + image.device + ", before" })
+		const before = el("img", { src: encodeURI(image.before), loading: "lazy", decoding: "async", alt: `${render} on ${image.device}, before` })
 		before.onload = img.onload
 		const beforeButton = el("button", { className: "plate", title: "Open the earlier image" }, [before])
 		beforeButton.onclick = () => open(index, true)
@@ -426,13 +427,13 @@ const draw = () => {
 	index.replaceChildren()
 	visible = []
 	if (report.errors.length) {
-		sheet.append(el("div", { className: "errors", textContent: report.errors.map((error) => error.device + " " + error.appearance + ": " + error.error).join("\n\n") }))
+		sheet.append(el("div", { className: "errors", textContent: report.errors.map((error) => `${error.device} ${error.appearance}: ${error.error}`).join("\n\n") }))
 	}
 	const folders = new Map()
 	report.groups.forEach((group, number) => {
 		const folder = folderOf(group.name)
-		if (!folders.has(folder)) folders.set(folder, [])
-		folders.get(folder).push({ group, id: "g" + number })
+		if (!folders.has(folder)) { folders.set(folder, []) }
+		folders.get(folder).push({ group, id: `g${number}` })
 	})
 	for (const [folder, entries] of folders) {
 		const links = []
@@ -441,14 +442,14 @@ const draw = () => {
 			let shown = 0
 			let failing = 0
 			for (const render of group.renders) {
-				const full = group.name ? group.name + "/" + render.name : render.name
-				if (state.query && !full.toLowerCase().includes(state.query)) continue
+				const full = group.name ? `${group.name}/${render.name}` : render.name
+				if (state.query && !full.toLowerCase().includes(state.query)) { continue }
 				const images = render.images.filter((image) =>
 					!state.hidden.has(image.device) &&
 					state.appearances.has(image.appearance) &&
 					(!state.failedOnly || !image.ok) &&
 					(!state.changedOnly || isChanged(image)))
-				if (!images.length) continue
+				if (!images.length) { continue }
 				shown += 1
 				failing += images.filter((image) => !image.ok).length
 				const strip = el("div", { className: "strip" })
@@ -458,24 +459,24 @@ const draw = () => {
 				}
 				section.append(el("div", { className: "render" }, [el("h3", { textContent: render.name }), strip]))
 			}
-			if (!shown) continue
+			if (!shown) { continue }
 			section.prepend(el("div", { className: "group-head" }, [
 				el("h2", { textContent: lastPart(group.name) || "Renders" }),
 				folder ? el("span", { className: "folder", textContent: folder }) : null,
 				el("span", { className: "count", textContent: plural(shown, "render") }),
 			]))
 			sheet.append(section)
-			const link = el("a", { href: "#" + id }, [
+			const link = el("a", { href: `#${id}` }, [
 				el("span", { textContent: lastPart(group.name) || "Renders" }),
-				el("small", { textContent: failing ? failing + " failed" : String(shown) }),
+				el("small", { textContent: failing ? `${failing} failed` : String(shown) }),
 			])
-			if (failing) link.classList.add("failing")
+			if (failing) { link.classList.add("failing") }
 			link.dataset.target = id
 			links.push(link)
 		}
-		if (links.length) index.append(el("h4", { textContent: folder || "Renders" }), ...links)
+		if (links.length) { index.append(el("h4", { textContent: folder || "Renders" }), ...links) }
 	}
-	if (!visible.length) sheet.append(el("p", { className: "empty", textContent: "No renders match." }))
+	if (!visible.length) { sheet.append(el("p", { className: "empty", textContent: "No renders match." })) }
 	watchSections()
 }
 
@@ -486,12 +487,14 @@ const watchSections = () => {
 	const links = new Map([...document.querySelectorAll("nav a")].map((link) => [link.dataset.target, link]))
 	observer = new IntersectionObserver((entries) => {
 		for (const entry of entries) {
-			if (!entry.isIntersecting) continue
-			for (const link of links.values()) link.classList.remove("active")
+			if (!entry.isIntersecting) { continue }
+			for (const link of links.values()) { link.classList.remove("active") }
 			links.get(entry.target.id)?.classList.add("active")
 		}
 	}, { rootMargin: "-120px 0px -70% 0px" })
-	document.querySelectorAll("section.group").forEach((section) => observer.observe(section))
+	for (const section of document.querySelectorAll("section.group")) {
+		observer.observe(section)
+	}
 }
 
 // Full size: arrows step through every image shown, the buttons below switch device for the same render.
@@ -508,15 +511,15 @@ const open = (index, before = viewingBefore) => {
 	const device = devices.get(image.device)
 	document.getElementById("viewer-title").textContent = render.name
 	document.getElementById("viewer-where").textContent = group.name
-	document.getElementById("viewer-counter").textContent = (index + 1) + " of " + visible.length
+	document.getElementById("viewer-counter").textContent = `${index + 1} of ${visible.length}`
 	stage.querySelector(".shown")?.remove()
 	let shown
 	if (image.ok) {
-		shown = el("img", { className: "shown", src: encodeURI(viewingBefore ? image.before : image.image), alt: render.name + " on " + image.device + (viewingBefore ? ", before" : "") })
+		shown = el("img", { className: "shown", src: encodeURI(viewingBefore ? image.before : image.image), alt: `${render.name} on ${image.device}${viewingBefore ? ", before" : ""}` })
 		shown.onload = () => {
 			const full = shown.naturalHeight >= device.height * device.scale - 2
 			const ratio = shown.getBoundingClientRect().width / device.width
-			shown.style.setProperty("--viewer-radius", full ? device.cornerRadius * ratio + "px" : "6px")
+			shown.style.setProperty("--viewer-radius", full ? `${device.cornerRadius * ratio}px` : "6px")
 		}
 	} else {
 		shown = el("div", { className: "failed shown", textContent: image.error || "Failed" })
@@ -525,14 +528,14 @@ const open = (index, before = viewingBefore) => {
 	const footer = document.getElementById("viewer-footer")
 	footer.replaceChildren()
 	visible.forEach((entry, at) => {
-		if (entry.render !== render || entry.group !== group) return
-		const button = el("button", { textContent: entry.image.device + (report.appearances.length > 1 ? " " + entry.image.appearance : "") })
+		if (entry.render !== render || entry.group !== group) { return }
+		const button = el("button", { textContent: entry.image.device + (report.appearances.length > 1 ? ` ${entry.image.appearance}` : "") })
 		button.setAttribute("aria-current", String(at === index))
 		button.onclick = () => open(at)
 		footer.append(button)
 	})
-	const change = image.before === undefined ? "" : " · " + (isChanged(image) ? "changed, " + percent(image.change) + " of pixels" : "same as before")
-	footer.append(el("div", { className: "detail", textContent: device.width + " × " + device.height + " pt @" + device.scale + "x · " + seconds(image.durationMs) + change + " · " + (viewingBefore ? image.before : image.image) }))
+	const change = image.before === undefined ? "" : ` · ${isChanged(image) ? `changed, ${percent(image.change)} of pixels` : "same as before"}`
+	footer.append(el("div", { className: "detail", textContent: `${device.width} × ${device.height} pt @${device.scale}x · ${seconds(image.durationMs)}${change} · ${viewingBefore ? image.before : image.image}` }))
 	if (viewer.hidden) {
 		viewer.hidden = false
 		document.body.style.overflow = "hidden"
@@ -547,14 +550,14 @@ flip.onclick = () => open(current, !viewingBefore)
 document.getElementById("viewer-prev").onclick = () => current > 0 && open(current - 1)
 document.getElementById("viewer-next").onclick = () => current < visible.length - 1 && open(current + 1)
 stage.onclick = (event) => {
-	if (event.target === stage) close()
+	if (event.target === stage) { close() }
 }
 document.addEventListener("keydown", (event) => {
 	if (!viewer.hidden) {
-		if (event.key === "Escape") close()
-		if (event.key === "ArrowRight" && current < visible.length - 1) open(current + 1)
-		if (event.key === "ArrowLeft" && current > 0) open(current - 1)
-		if ((event.key === "b" || event.key === "B") && !flip.hidden) open(current, !viewingBefore)
+		if (event.key === "Escape") { close() }
+		if (event.key === "ArrowRight" && current < visible.length - 1) { open(current + 1) }
+		if (event.key === "ArrowLeft" && current > 0) { open(current - 1) }
+		if ((event.key === "b" || event.key === "B") && !flip.hidden) { open(current, !viewingBefore) }
 		return
 	}
 	if (event.key === "/" && document.activeElement !== search) {
