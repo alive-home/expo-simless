@@ -2,7 +2,7 @@ import fs from "node:fs"
 import { createRequire } from "node:module"
 import path from "node:path"
 import { expoRequire } from "./expo.ts"
-import { PACKAGE_ROOT, runOrThrow } from "./process.ts"
+import { NODE, PACKAGE_ROOT, runOrThrow } from "./process.ts"
 import type { Project } from "./project.ts"
 import type { Platform } from "./renderer.ts"
 
@@ -330,7 +330,7 @@ export const bundleScript = async (
 	options.log("Bundling with expo export:embed…")
 	// export:embed accepts --config but never hands it to Metro; this override is the hook it does read (marked
 	// internal in @expo/cli's instantiateMetro).
-	await runOrThrow(process.execPath, [expoRequire(project.root).resolve("expo/bin/cli"), "export:embed", ...common], {
+	await runOrThrow(NODE, [expoRequire(project.root).resolve("expo/bin/cli"), "export:embed", ...common], {
 		cwd: project.root,
 		env: { ...process.env, CI: "1", EXPO_NO_TELEMETRY: "1", EXPO_OVERRIDE_METRO_CONFIG: metroConfig },
 		inherit: options.verbose,

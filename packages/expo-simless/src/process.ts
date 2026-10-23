@@ -7,6 +7,30 @@ import { fileURLToPath } from "node:url"
 
 export const PACKAGE_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..")
 
+// The Node to run the Expo CLI, autolinking and other tools with. Under Bun (`bunx --bun simless`) that is the first
+// `node` on the PATH that is not Bun itself, since Expo's config loader does not run on Bun and `bunx --bun` puts a
+// `node` linked to Bun first on the PATH. Its directory then goes first on this process's PATH, so the tools those
+// start in turn (fingerprinting, the Podfile's autolinking, Gradle's) find it too.
+const findNode = (): string => {
+	if (!process.versions.bun) {
+		return process.execPath
+	}
+	const bun = fs.realpathSync(process.execPath)
+	for (const directory of (process.env.PATH ?? "").split(path.delimiter)) {
+		const candidate = path.join(directory, "node")
+		try {
+			if (fs.realpathSync(candidate) !== bun) {
+				fs.accessSync(candidate, fs.constants.X_OK)
+				process.env.PATH = [directory, process.env.PATH].join(path.delimiter)
+				return candidate
+			}
+		} catch {}
+	}
+	throw new Error("simless runs the Expo CLI with Node, and found no node on the PATH besides Bun")
+}
+
+export const NODE = findNode()
+
 export const cacheRoot = (): string =>
 	process.env.SIMLESS_CACHE ?? path.join(os.homedir(), "Library", "Caches", "simless")
 

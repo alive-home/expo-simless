@@ -9,7 +9,16 @@ import type { Project } from "./project.ts"
 
 export type { Device, Insets } from "./devices.ts"
 export { type AppConfig, expoRequire } from "./expo.ts"
-export { buildAtomically, cacheRoot, hashOf, type RunOptions, type RunResult, run, runOrThrow } from "./process.ts"
+export {
+	buildAtomically,
+	cacheRoot,
+	hashOf,
+	NODE,
+	type RunOptions,
+	type RunResult,
+	run,
+	runOrThrow,
+} from "./process.ts"
 export type { Project } from "./project.ts"
 
 export type Appearance = "light" | "dark"

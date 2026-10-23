@@ -1,6 +1,6 @@
 import { createRequire } from "node:module"
 import path from "node:path"
-import { runOrThrow } from "./process.ts"
+import { NODE, runOrThrow } from "./process.ts"
 
 // The parts of `expo config --type introspect` this reads: the config after its plugins have run, as prebuild
 // would write it.
@@ -18,7 +18,7 @@ export const expoRequire = (root: string) => {
 
 export const readAppConfig = async (root: string): Promise<AppConfig> => {
 	const cli = expoRequire(root).resolve("expo/bin/cli")
-	const { stdout } = await runOrThrow(process.execPath, [cli, "config", "--type", "introspect", "--json"], {
+	const { stdout } = await runOrThrow(NODE, [cli, "config", "--type", "introspect", "--json"], {
 		cwd: root,
 		env: { ...process.env, EXPO_NO_TELEMETRY: "1" },
 	})

@@ -1,7 +1,16 @@
 import { execFileSync } from "node:child_process"
 import fs from "node:fs"
 import path from "node:path"
-import { buildAtomically, cacheRoot, expoRequire, hashOf, type Project, run, runOrThrow } from "expo-simless/renderer"
+import {
+	buildAtomically,
+	cacheRoot,
+	expoRequire,
+	hashOf,
+	NODE,
+	type Project,
+	run,
+	runOrThrow,
+} from "expo-simless/renderer"
 import { addMissingCatalystSlices } from "./catalystSlices.ts"
 import { nativeFingerprint } from "./fingerprint.ts"
 import { applyInfoPlist, recordHostInfoPlist } from "./infoPlist.ts"
@@ -149,7 +158,7 @@ const packageRootOf = (podspecDir: string, projectRoot: string): string => {
 export const resolveNativePackages = (project: Project, exclude: string[]): NativePackage[] => {
 	const packages = new Map<string, NativePackage>()
 	const output = execFileSync(
-		process.execPath,
+		NODE,
 		[
 			"--no-warnings",
 			"--eval",
@@ -178,7 +187,7 @@ export const resolveNativePackages = (project: Project, exclude: string[]): Nati
 	}
 	const configScript = path.join(NATIVE_ROOT, "native-host", "react-native-config.cjs")
 	const config = JSON.parse(
-		execFileSync(process.execPath, [configScript, project.root, JSON.stringify(exclude), hostDirOf(project)], {
+		execFileSync(NODE, [configScript, project.root, JSON.stringify(exclude), hostDirOf(project)], {
 			cwd: project.root,
 			encoding: "utf8",
 			maxBuffer: 64 * 1024 * 1024,
@@ -284,6 +293,9 @@ const buildHost = async (
 	// One log per attempt: a retry would otherwise overwrite the error that caused it.
 	const logPath = path.join(hostDir, `build-${attempt}.log`)
 	await writeHostProject(project, exclude)
+	// The Node that React Native's and Expo's build scripts run. pod install writes `command -v node` here only when the
+	// file is missing, and under `bunx --bun` that is Bun, which cannot read the app config.
+	fs.writeFileSync(path.join(hostDir, ".xcode.env.local"), `export NODE_BINARY=${JSON.stringify(NODE)}\n`)
 	log("Installing pods for the native host…")
 	const install = () => run("pod", ["install"], { cwd: hostDir, env: podEnv(project), inherit: verbose })
 	let pods = await install()

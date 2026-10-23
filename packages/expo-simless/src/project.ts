@@ -1,5 +1,5 @@
 import fs from "node:fs"
-import { registerHooks } from "node:module"
+import nodeModule from "node:module"
 import path from "node:path"
 import { pathToFileURL } from "node:url"
 import type { SimlessConfig } from "../runtime/index.js"
@@ -70,14 +70,15 @@ const packageTypeOf = (file: string): string | null => {
 
 // An app's package.json seldom sets "type", and Node then reads an `export default` config as CommonJS first and warns
 // before it falls back to ESM. A config there is loaded as the ES module it is; an explicit "commonjs" is left alone.
+// Bun has no module hooks, and needs none: it reads such a file as ESM itself.
 const importConfig = async (file: string): Promise<unknown> => {
 	const url = pathToFileURL(file).href
 	const extension = path.extname(file)
-	if (![".ts", ".js"].includes(extension) || packageTypeOf(file) !== null) {
+	if (![".ts", ".js"].includes(extension) || packageTypeOf(file) !== null || !nodeModule.registerHooks) {
 		return import(url)
 	}
 	const format = extension === ".ts" ? "module-typescript" : "module"
-	const hooks = registerHooks({
+	const hooks = nodeModule.registerHooks({
 		resolve: (specifier, context, nextResolve) => {
 			const resolved = nextResolve(specifier, context)
 			return resolved.url === url ? { ...resolved, format } : resolved
