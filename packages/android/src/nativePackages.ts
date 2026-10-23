@@ -1,7 +1,7 @@
 import { execFileSync } from "node:child_process"
 import fs from "node:fs"
 import path from "node:path"
-import { expoRequire, NODE, type Project } from "expo-simless/renderer"
+import { expoRequire, NODE, type Project } from "@alivelabs/expo-simless/renderer"
 
 export type NativePackage = {
 	// The name autolinking uses. A local module under the app's modules/ is named after its directory.

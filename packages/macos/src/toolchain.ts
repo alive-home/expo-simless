@@ -1,7 +1,7 @@
 import fs from "node:fs"
 import path from "node:path"
 import { fileURLToPath } from "node:url"
-import { runOrThrow } from "expo-simless/renderer"
+import { runOrThrow } from "@alivelabs/expo-simless/renderer"
 
 export const PACKAGE_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..")
 export const NATIVE_ROOT = path.join(PACKAGE_ROOT, "ios")

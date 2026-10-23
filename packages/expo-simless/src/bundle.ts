@@ -13,7 +13,7 @@ export type ComponentTarget = {
 }
 
 // What a render script imports; it resolves to the runtime's copy in the work directory.
-const PACKAGE_NAME = "expo-simless"
+const PACKAGE_NAME = "@alivelabs/expo-simless"
 
 export type BundleOptions = {
 	// Packages whose native code is in the host, and ones left out of it, which get the generic stand-in unless the

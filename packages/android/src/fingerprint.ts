@@ -1,4 +1,4 @@
-import { expoRequire, hashOf } from "expo-simless/renderer"
+import { expoRequire, hashOf } from "@alivelabs/expo-simless/renderer"
 
 type FingerprintSource = {
 	type: string

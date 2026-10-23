@@ -1,5 +1,5 @@
 {
-	"name": "@expo-simless/macos",
+	"name": "@alivelabs/expo-simless-macos",
 	"version": "0.1.0",
 	"description": "The expo-simless renderer for iOS: draws with the iOS UIKit a Mac runs through Mac Catalyst.",
 	"license": "MIT",
@@ -28,9 +28,9 @@
 		"check": "tsc --noEmit -p ."
 	},
 	"peerDependencies": {
-		"expo-simless": "workspace:*"
+		"@alivelabs/expo-simless": "workspace:*"
 	},
 	"devDependencies": {
-		"expo-simless": "workspace:*"
+		"@alivelabs/expo-simless": "workspace:*"
 	}
 }

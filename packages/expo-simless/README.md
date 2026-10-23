@@ -6,7 +6,7 @@ to use it.
 
 ```tsx
 // simless/cards.render.tsx
-import { render } from "expo-simless"
+import { render } from "@alivelabs/expo-simless"
 
 export default async () => {
 	await render(<Card title="Hello" />, { name: "card", fit: true })
@@ -52,14 +52,14 @@ Things the host fakes so the pixels match a phone rather than a Mac:
 
 ## Install
 
-expo-simless is the CLI and the `render()` API; a renderer package draws. For iOS that is `@expo-simless/macos`,
-for Android `@expo-simless/android` (an emulator booted from a snapshot; see its README):
+expo-simless is the CLI and the `render()` API; a renderer package draws. For iOS that is `@alivelabs/expo-simless-macos`,
+for Android `@alivelabs/expo-simless-android` (an emulator booted from a snapshot; see its README):
 
 ```bash
-pnpm add -D expo-simless @expo-simless/macos @expo-simless/android
+pnpm add -D @alivelabs/expo-simless @alivelabs/expo-simless-macos @alivelabs/expo-simless-android
 ```
 
-`--platform` picks the renderer: `ios`, the default, or `android`. A renderer implements the contract in `expo-simless/renderer`: it builds a native host from the
+`--platform` picks the renderer: `ios`, the default, or `android`. A renderer implements the contract in `@alivelabs/expo-simless/renderer`: it builds a native host from the
 app's native modules and says how to start it on a plan; the CLI bundles the JavaScript, writes the plans and reads
 the results.
 
@@ -85,7 +85,7 @@ what the app sets up at launch, and pass any props: images, callbacks, Reanimate
 it awaits becomes one PNG per device and appearance.
 
 ```tsx
-import { render, waitFor } from "expo-simless"
+import { render, waitFor } from "@alivelabs/expo-simless"
 
 export default async () => {
 	await signInAsTestUser() // whatever the app does before its first screen
@@ -215,7 +215,7 @@ the project rather than to a script. `SimlessConfig` types it; Node loads a `.ts
 stripping, so it can use types but not enums or other syntax that needs compiling.
 
 ```ts
-import type { SimlessConfig } from "expo-simless"
+import type { SimlessConfig } from "@alivelabs/expo-simless"
 
 export default {
 	// A JS module name, or a project file's path, to a replacement: a path relative to the project root, or a package

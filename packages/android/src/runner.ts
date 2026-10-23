@@ -5,7 +5,7 @@
 import { spawn } from "node:child_process"
 import fs from "node:fs"
 import path from "node:path"
-import { hashOf } from "expo-simless/renderer"
+import { hashOf } from "@alivelabs/expo-simless/renderer"
 import { panelOf } from "./devices.ts"
 import {
 	adb,

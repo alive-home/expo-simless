@@ -1,4 +1,4 @@
-import type { Device } from "expo-simless/renderer"
+import type { Device } from "@alivelabs/expo-simless/renderer"
 
 // A preset is the panel itself: what `wm size` and `wm density` set on the emulator, so one emulator plays every
 // device. Widths and heights in dp follow from it, as on a phone.

@@ -10,7 +10,7 @@ import {
 	type Project,
 	run,
 	runOrThrow,
-} from "expo-simless/renderer"
+} from "@alivelabs/expo-simless/renderer"
 import { addMissingCatalystSlices } from "./catalystSlices.ts"
 import { nativeFingerprint } from "./fingerprint.ts"
 import { applyInfoPlist, recordHostInfoPlist } from "./infoPlist.ts"

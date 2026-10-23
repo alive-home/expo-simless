@@ -49,7 +49,7 @@ export declare const waitFor: <T>(promise: Promise<T>) => Promise<T>
  * `simless.config.ts` (or `.mts`, `.cts`, `.js`, `.mjs`, `.cjs`, `.json`) in the project root:
  *
  * ```ts
- * import type { SimlessConfig } from "expo-simless"
+ * import type { SimlessConfig } from "@alivelabs/expo-simless"
  *
  * export default {
  * 	fonts: ["src/assets/fonts/*"],

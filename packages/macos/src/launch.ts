@@ -1,6 +1,6 @@
 import fs from "node:fs"
 import path from "node:path"
-import type { HostLaunch, HostLaunchOptions } from "expo-simless/renderer"
+import type { HostLaunch, HostLaunchOptions } from "@alivelabs/expo-simless/renderer"
 
 // How to start a Catalyst host on a plan, in a home of its own.
 export const launchHost = (

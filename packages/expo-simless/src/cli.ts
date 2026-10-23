@@ -36,7 +36,7 @@ Usage
 
 A render script is a module whose default export is an async function:
 
-  import { render } from "expo-simless"
+  import { render } from "@alivelabs/expo-simless"
 
   export default async () => {
     await render(<ProfileCard name="Ada" />, { name: "profile-card", fit: true })
@@ -59,7 +59,7 @@ Output
   nothing could be rendered (bad arguments, a failed build or bundle, a script that throws before its first render).
 
 Options
-  --platform <name>        ios (drawn by @expo-simless/macos) or android (not built yet). Default ios
+  --platform <name>        ios (drawn by @alivelabs/expo-simless-macos) or android (not built yet). Default ios
   --device <name,...>      Device preset(s) or WIDTHxHEIGHT@SCALE (default iphone-17-pro on ios; simless devices
                            lists them). This flag and --only take a comma-separated list, or repeat
   --appearance <mode>      light, dark or both (default light)

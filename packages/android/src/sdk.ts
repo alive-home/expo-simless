@@ -1,7 +1,7 @@
 import fs from "node:fs"
 import os from "node:os"
 import path from "node:path"
-import { cacheRoot, run } from "expo-simless/renderer"
+import { cacheRoot, run } from "@alivelabs/expo-simless/renderer"
 
 export type SystemImage = {
 	// The sdkmanager id, e.g. system-images;android-36;google_apis;arm64-v8a.
@@ -67,7 +67,7 @@ export const findSdk = (): Promise<AndroidSdk | string> => {
 	found ??= (async () => {
 		const root = sdkRoot()
 		if (!root) {
-			return "@expo-simless/android needs the Android SDK: install Android Studio, or set ANDROID_HOME"
+			return "@alivelabs/expo-simless-android needs the Android SDK: install Android Studio, or set ANDROID_HOME"
 		}
 		const abi = hostAbi()
 		const adb = path.join(root, "platform-tools", "adb")
@@ -92,13 +92,13 @@ export const findSdk = (): Promise<AndroidSdk | string> => {
 		const image = pickSystemImage(root, abi)
 		if (!image) {
 			return (
-				`@expo-simless/android needs an emulator image it can run as root (google_apis or default, ${abi}): ` +
+				`@alivelabs/expo-simless-android needs an emulator image it can run as root (google_apis or default, ${abi}): ` +
 				`sdkmanager "system-images;android-36;google_apis;${abi}"`
 			)
 		}
 		const java = await javaHome()
 		if (!java) {
-			return "@expo-simless/android builds its host with Gradle, which needs a JDK 17 or later: set JAVA_HOME"
+			return "@alivelabs/expo-simless-android builds its host with Gradle, which needs a JDK 17 or later: set JAVA_HOME"
 		}
 		return { root, adb, emulator, avdmanager: avdmanager ?? "", image, javaHome: java, abi }
 	})()

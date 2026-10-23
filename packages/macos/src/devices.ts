@@ -1,4 +1,4 @@
-import type { Device } from "expo-simless/renderer"
+import type { Device } from "@alivelabs/expo-simless/renderer"
 
 const phone = (
 	name: string,

@@ -87,7 +87,7 @@ jsi::Function hostFunction(jsi::Runtime &runtime, const char *name, unsigned int
 
 // Installs globalThis.__simless before the bundle runs, so runtime/index.js can call it at module scope. The script
 // drives the host: mount(id, options) shows a render, ready/fail report on it, result(id) is how it went, and
-// done(script) ends the run. The same contract as ios/react-native/SMLReactHost.mm in @expo-simless/macos.
+// done(script) ends the run. The same contract as ios/react-native/SMLReactHost.mm in @alivelabs/expo-simless-macos.
 class SimlessBindingsInstaller : public jni::HybridClass<SimlessBindingsInstaller, react::JBindingsInstaller> {
  public:
   static constexpr auto kJavaDescriptor = "Ldev/simless/bindings/SimlessBindingsInstaller;";

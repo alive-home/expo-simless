@@ -1,4 +1,4 @@
-// The host's Gradle settings, written into node_modules/.cache/simless/android-host by @expo-simless/android, with
+// The host's Gradle settings, written into node_modules/.cache/simless/android-host by @alivelabs/expo-simless-android, with
 // the project's root and the modules to leave out filled in. Modeled on what `expo prebuild` writes, with autolinking
 // pointed at the project rather than at this directory's parent.
 pluginManagement {

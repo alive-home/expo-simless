@@ -1,7 +1,7 @@
 import fs from "node:fs"
 import path from "node:path"
 import { fileURLToPath } from "node:url"
-import { cacheRoot, hashOf, type Project, run } from "expo-simless/renderer"
+import { cacheRoot, hashOf, type Project, run } from "@alivelabs/expo-simless/renderer"
 import { nativeFingerprint } from "./fingerprint.ts"
 import type { NativePackage } from "./nativePackages.ts"
 import { type AndroidSdk, sdkEnv } from "./sdk.ts"
@@ -22,7 +22,7 @@ const DEFAULT_GRADLE_VERSION = "9.4.1"
 
 // Native code that only makes sense in a running app: dev tooling, OTA updates (which also take over where the
 // bundle is loaded from), and the splash screen, which covers the root view until the app hides it. The same list
-// @expo-simless/macos leaves out, so a render script sees the same modules on both platforms.
+// @alivelabs/expo-simless-macos leaves out, so a render script sees the same modules on both platforms.
 export const DEFAULT_NATIVE_EXCLUDE = [
 	"expo-dev-client",
 	"expo-dev-launcher",

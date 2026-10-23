@@ -2,7 +2,7 @@ import { type ChildProcess, execFileSync, spawn } from "node:child_process"
 import fs from "node:fs"
 import net from "node:net"
 import path from "node:path"
-import { run } from "expo-simless/renderer"
+import { run } from "@alivelabs/expo-simless/renderer"
 import { type AndroidSdk, avdHome, sdkEnv } from "./sdk.ts"
 
 export const HOST_PACKAGE = "dev.simless.host"

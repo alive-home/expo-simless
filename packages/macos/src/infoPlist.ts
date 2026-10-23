@@ -1,6 +1,6 @@
 import fs from "node:fs"
 import path from "node:path"
-import { type AppConfig, hashOf, runOrThrow } from "expo-simless/renderer"
+import { type AppConfig, hashOf, runOrThrow } from "@alivelabs/expo-simless/renderer"
 
 // The host's own: its identity, the way it launches and runs as a hidden iPad-idiom Catalyst app, and keys that
 // name files only the real app bundle has (a launch storyboard, embedded fonts, which the host registers itself).

@@ -1,10 +1,10 @@
-# @expo-simless/android
+# @alivelabs/expo-simless-android
 
 The Android renderer for [expo-simless](../expo-simless). It draws with Android's own views, on an emulator booted
 from a snapshot, in a host app built from the project's own native modules.
 
 ```bash
-pnpm add -D expo-simless @expo-simless/android
+pnpm add -D @alivelabs/expo-simless @alivelabs/expo-simless-android
 simless run simless/screens/Home.render.tsx --platform android
 simless show simless/screens/Home.render.tsx --only tapped-out --platform android
 simless devices --platform android

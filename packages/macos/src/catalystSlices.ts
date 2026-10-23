@@ -1,6 +1,6 @@
 import fs from "node:fs"
 import path from "node:path"
-import { runOrThrow } from "expo-simless/renderer"
+import { runOrThrow } from "@alivelabs/expo-simless/renderer"
 
 // Prebuilt static libraries shipped as xcframeworks often have iOS, simulator and macOS slices and no Mac
 // Catalyst one (Skia). A Catalyst object is the same arm64 code as an iOS one; what differs is the platform in

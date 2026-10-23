@@ -1,5 +1,5 @@
 // Bundled by Metro inside the project being rendered, not run by Node. The CLI copies it next to the generated
-// entry, and the project's imports of "expo-simless" resolve to that copy, so `react` and
+// entry, and the project's imports of "@alivelabs/expo-simless" resolve to that copy, so `react` and
 // `react-native` are the project's own and there is one instance of this module.
 import { Component, createElement, isValidElement, useEffect, useRef } from "react"
 import { AppRegistry, StyleSheet, View } from "react-native"

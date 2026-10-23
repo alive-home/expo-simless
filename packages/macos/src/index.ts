@@ -1,4 +1,4 @@
-import type { Renderer } from "expo-simless/renderer"
+import type { Renderer } from "@alivelabs/expo-simless/renderer"
 import { DEFAULT_DEVICE, DEVICES } from "./devices.ts"
 import { launchHost } from "./launch.ts"
 import { cocoapodsAvailable, ensureNativeHost, expoModuleNames } from "./nativeHost.ts"
@@ -11,7 +11,9 @@ export const renderer: Renderer = {
 	devices: DEVICES,
 	defaultDevice: DEFAULT_DEVICE,
 	unavailable: async () =>
-		process.platform === "darwin" ? null : "@expo-simless/macos renders through Mac Catalyst, so it only runs on macOS",
+		process.platform === "darwin"
+			? null
+			: "@alivelabs/expo-simless-macos renders through Mac Catalyst, so it only runs on macOS",
 	prepare: async (project, { log, verbose }) => {
 		// The host is built with the app's own native modules, which CocoaPods links as it does for the app.
 		if (!(await cocoapodsAvailable())) {

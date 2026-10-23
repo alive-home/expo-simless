@@ -45,7 +45,7 @@ private const val ANIMATING_GRACE_MS = 2000L
 private const val POLL_MS = 16L
 
 // Runs a plan: the bundle is the script, and it asks for each render with __simless.mount(). The same contract as
-// ios/react-native/SMLReactHost.mm in @expo-simless/macos; the runner on the Mac pushes the plan and pulls the PNGs.
+// ios/react-native/SMLReactHost.mm in @alivelabs/expo-simless-macos; the runner on the Mac pushes the plan and pulls the PNGs.
 // A ReactActivity behind Expo's delegate wrapper, as an Expo app's MainActivity is: React Native sets the window up
 // edge to edge from it, and Expo modules' activity listeners (navigation bar, system UI) run as they do in the app.
 // It has no main component; each render mounts a surface of its own.

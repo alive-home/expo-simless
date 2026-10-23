@@ -1,7 +1,7 @@
 import fs from "node:fs"
 import os from "node:os"
 import path from "node:path"
-import { type Appearance, type Device, type JobResult, run } from "expo-simless/renderer"
+import { type Appearance, type Device, type JobResult, run } from "@alivelabs/expo-simless/renderer"
 import { launchHost } from "./launch.ts"
 
 // One SwiftUI view on one device in one appearance.

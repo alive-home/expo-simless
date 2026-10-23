@@ -4,7 +4,7 @@ import { pathToFileURL } from "node:url"
 import type { Device } from "./devices.ts"
 import type { Project } from "./project.ts"
 
-// What a renderer package (@expo-simless/macos, @expo-simless/android) builds on. The CLI bundles the app's
+// What a renderer package (@alivelabs/expo-simless-macos, @alivelabs/expo-simless-android) builds on. The CLI bundles the app's
 // JavaScript, writes plans and reads results; a renderer builds the native host that runs them.
 
 export type { Device, Insets } from "./devices.ts"
@@ -115,8 +115,8 @@ export type Renderer = {
 }
 
 const RENDERER_PACKAGES: Record<Platform, string> = {
-	ios: "@expo-simless/macos",
-	android: "@expo-simless/android",
+	ios: "@alivelabs/expo-simless-macos",
+	android: "@alivelabs/expo-simless-android",
 }
 
 export const isPlatform = (value: string): value is Platform => value in RENDERER_PACKAGES

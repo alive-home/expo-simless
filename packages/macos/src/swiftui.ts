@@ -8,7 +8,7 @@ import {
 	runOrThrow,
 	type SwiftUIRequest,
 	type SwiftUIResult,
-} from "expo-simless/renderer"
+} from "@alivelabs/expo-simless/renderer"
 import { type Job, runJobs } from "./plan.ts"
 import {
 	compileCapture,
