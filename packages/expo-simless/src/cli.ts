@@ -358,6 +358,7 @@ const bundleOptionsFor = (renderer: Renderer, host: NativeHost, options: Options
 	platform: renderer.platform,
 	clock: clockOf(options, project),
 	dev: Boolean(options.dev),
+	bytecode: Boolean(host.bytecode),
 	verbose: Boolean(options.verbose),
 	log,
 	nativeLinked: host.linked,
@@ -509,7 +510,7 @@ const runReactNative = async (
 				only,
 				shared: Boolean(options.shared),
 			}
-			const symbolicate = symbolicator(bundle.sourceMapPath, project.root)
+			const symbolicate = symbolicator(bundle.sourceMapPath, project.root, bundle.bytecodeMapPath)
 			const [firstVariant] = variants
 			if (options.list && firstVariant) {
 				const listed = await listRenders(script, firstVariant)

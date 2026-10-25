@@ -78,36 +78,47 @@ const alive = (pid: number) => {
 	}
 }
 
-// One emulator per slot; a slot is held by the runner that made its lock directory, until it ends.
-const acquireSlot = async (pool: string, count: number) => {
+const readState = (file: string): SlotState | null => {
+	try {
+		return JSON.parse(fs.readFileSync(file, "utf8")) as SlotState
+	} catch {
+		return null
+	}
+}
+
+const tryLock = (pool: string, index: number) => {
+	const lock = path.join(pool, `slot-${index}.lock`)
+	try {
+		fs.mkdirSync(lock)
+		fs.writeFileSync(path.join(lock, "owner"), String(process.pid))
+		return { index, release: () => fs.rmSync(lock, { recursive: true, force: true }) }
+	} catch {
+		// A runner the CLI killed on its timeout leaves its lock behind.
+		const owner = Number(fs.readFileSync(path.join(lock, "owner"), { encoding: "utf8", flag: "a+" }) || 0)
+		if (owner > 0 && !alive(owner)) {
+			fs.rmSync(lock, { recursive: true, force: true })
+		}
+		return null
+	}
+}
+
+// One emulator per slot; a slot is held by the runner that made its lock directory, until it ends. A free one
+// already showing the plan's display comes first: the first switch to a display costs an emulator seconds.
+const acquireSlot = async (pool: string, count: number, display: string) => {
 	const started = Date.now()
+	const slots = Array.from({ length: count }, (_, index) => index)
 	for (;;) {
-		for (let index = 0; index < count; index += 1) {
-			const lock = path.join(pool, `slot-${index}.lock`)
-			try {
-				fs.mkdirSync(lock)
-				fs.writeFileSync(path.join(lock, "owner"), String(process.pid))
-				return { index, release: () => fs.rmSync(lock, { recursive: true, force: true }) }
-			} catch {
-				// A runner the CLI killed on its timeout leaves its lock behind.
-				const owner = Number(fs.readFileSync(path.join(lock, "owner"), { encoding: "utf8", flag: "a+" }) || 0)
-				if (owner > 0 && !alive(owner)) {
-					fs.rmSync(lock, { recursive: true, force: true })
-				}
+		const showing = slots.filter((index) => readState(path.join(pool, `slot-${index}.json`))?.display === display)
+		for (const index of [...showing, ...slots.filter((index) => !showing.includes(index))]) {
+			const slot = tryLock(pool, index)
+			if (slot) {
+				return slot
 			}
 		}
 		if (Date.now() - started > SLOT_WAIT_MS) {
 			throw new Error(`no emulator came free in ${SLOT_WAIT_MS / 1000}s`)
 		}
 		await sleep(150)
-	}
-}
-
-const readState = (file: string): SlotState | null => {
-	try {
-		return JSON.parse(fs.readFileSync(file, "utf8")) as SlotState
-	} catch {
-		return null
 	}
 }
 
@@ -184,8 +195,8 @@ const pushOnce = async (config: RunnerConfig, state: SlotState, local: string, p
 	return remote
 }
 
-// The device as the plan's device and appearance: one emulator plays every preset.
-const configureDisplay = async (config: RunnerConfig, state: SlotState, plan: Plan) => {
+// The plan's device and appearance as the emulator shows them: one emulator plays every preset.
+const displayOf = (plan: Plan) => {
 	const panel = panelOf({
 		name: "",
 		width: plan.template.width,
@@ -195,14 +206,17 @@ const configureDisplay = async (config: RunnerConfig, state: SlotState, plan: Pl
 		cornerRadius: 0,
 	})
 	const night = plan.template.appearance === "dark" ? "yes" : "no"
-	const display = `${panel.widthPx}x${panel.heightPx}@${panel.dpi}/${night}`
-	if (state.display !== display) {
-		await shell(
-			config.sdk,
-			state.serial,
-			`wm size ${panel.widthPx}x${panel.heightPx}; wm density ${panel.dpi}; cmd uimode night ${night}`,
-		)
-		state.display = display
+	return {
+		key: `${panel.widthPx}x${panel.heightPx}@${panel.dpi}/${night}`,
+		command: `wm size ${panel.widthPx}x${panel.heightPx}; wm density ${panel.dpi}; cmd uimode night ${night}`,
+	}
+}
+
+const configureDisplay = async (config: RunnerConfig, state: SlotState, plan: Plan) => {
+	const display = displayOf(plan)
+	if (state.display !== display.key) {
+		await shell(config.sdk, state.serial, display.command)
+		state.display = display.key
 	}
 	if (config.timeZone && state.timeZone !== config.timeZone) {
 		await shell(config.sdk, state.serial, `cmd alarm set-timezone ${config.timeZone}`)
@@ -227,61 +241,71 @@ const devicePlan = async (config: RunnerConfig, state: SlotState, plan: Plan, ru
 }
 
 // A fresh install's state for every run (the host's files, AsyncStorage, preferences), as each macOS host
-// process gets an empty home.
-const resetHost = async (config: RunnerConfig, state: SlotState) => {
-	await shell(config.sdk, state.serial, `pm clear ${HOST_PACKAGE}`)
-	if (config.locale) {
-		await shell(config.sdk, state.serial, `cmd locale set-app-locales ${HOST_PACKAGE} --locales ${config.locale}`)
-	}
+// process gets an empty home, and an empty folder and log for this run. One adb call: each costs a round trip.
+const resetHost = async (config: RunnerConfig, state: SlotState, runDir: string) => {
+	await shell(
+		config.sdk,
+		state.serial,
+		[
+			`pm clear ${HOST_PACKAGE} > /dev/null`,
+			...(config.locale ? [`cmd locale set-app-locales ${HOST_PACKAGE} --locales ${config.locale}`] : []),
+			`mkdir -p ${runDir}/out`,
+			`chmod -R 777 ${runDir}`,
+			"logcat -c",
+		].join(" && "),
+	)
 }
 
-const startHost = async (config: RunnerConfig, state: SlotState, plan: Plan, runDir: string) => {
-	await shell(config.sdk, state.serial, `mkdir -p ${runDir}/out && chmod -R 777 ${runDir}`)
+const pushPlan = async (config: RunnerConfig, state: SlotState, plan: Plan, runDir: string) => {
 	const local = path.join(path.dirname(plan.result), `device-plan-${process.pid}.json`)
 	fs.writeFileSync(local, JSON.stringify(await devicePlan(config, state, plan, runDir)))
 	await adb(config.sdk, state.serial, ["push", local, `${runDir}/plan.json`])
 	fs.rmSync(local, { force: true })
-	await adb(config.sdk, state.serial, ["logcat", "-c"])
-	await shell(config.sdk, state.serial, `am start -W -n ${HOST_ACTIVITY} --es plan ${runDir}/plan.json`)
 }
 
-const logcat = async (config: RunnerConfig, state: SlotState) =>
-	(await adb(config.sdk, state.serial, ["logcat", "-d", "-v", "tag", ...LOG_FILTER], 10_000)).stdout
+const startCommand = (runDir: string) => `am start -n ${HOST_ACTIVITY} --es plan ${runDir}/plan.json > /dev/null`
+
+// Starts the host and waits on the device until it writes its result, or its process is gone without one, so
+// waiting costs one adb call rather than one per poll. Gone for a second in a row: the app's process shows up a
+// moment after the activity is started.
+const runHost = async (config: RunnerConfig, state: SlotState, runDir: string) => {
+	const result = `${runDir}/result.json`
+	const gone = Math.ceil(1000 / POLL_MS)
+	const status = await adb(config.sdk, state.serial, [
+		"shell",
+		[
+			`${startCommand(runDir)} && gone=0`,
+			`while [ ! -f ${result} ]; do if pidof ${HOST_PACKAGE} > /dev/null; then gone=0; else gone=$((gone + 1)); [ $gone -ge ${gone} ] && break; fi; sleep ${POLL_MS / 1000}; done`,
+			`[ -f ${result} ] && echo done || echo gone`,
+		].join("; "),
+	])
+	return status.stdout.trim() === "done"
+}
+
+// The run's log, and the host stopped and its folder gone.
+const finishRun = async (config: RunnerConfig, state: SlotState, runDir: string) =>
+	(
+		await shell(
+			config.sdk,
+			state.serial,
+			`logcat -d -v tag ${LOG_FILTER.join(" ")}; am force-stop ${HOST_PACKAGE}; rm -rf ${runDir}`,
+		)
+	)
 		.split("\n")
 		.map((line) => line.trimEnd())
 		.filter(Boolean)
 
-// Until the host writes its result, or its process is gone without one.
-const waitForResult = async (config: RunnerConfig, state: SlotState, runDir: string) => {
-	for (let gone = 0; ; ) {
-		const status = await shell(
-			config.sdk,
-			state.serial,
-			`test -f ${runDir}/result.json && echo done || (pidof ${HOST_PACKAGE} > /dev/null && echo running || echo gone)`,
-		)
-		if (status === "done") {
-			return true
-		}
-		// Twice in a row: the process can be between the activity starting and the app's process showing up.
-		gone = status === "gone" ? gone + 1 : 0
-		if (gone >= 2) {
-			return false
-		}
-		await sleep(POLL_MS)
-	}
-}
-
 const collect = async (config: RunnerConfig, state: SlotState, plan: Plan, runDir: string) => {
 	const staging = fs.mkdtempSync(path.join(path.dirname(plan.result), "pulled-"))
 	try {
-		await adb(config.sdk, state.serial, ["pull", `${runDir}/result.json`, staging])
-		await adb(config.sdk, state.serial, ["pull", `${runDir}/out`, staging])
-		const result = JSON.parse(fs.readFileSync(path.join(staging, "result.json"), "utf8")) as { jobs?: JobResult[] }
-		const logs = await logcat(config, state)
+		await adb(config.sdk, state.serial, ["pull", runDir, staging])
+		const logs = await finishRun(config, state, runDir)
+		const pulledDir = path.join(staging, path.basename(runDir))
+		const result = JSON.parse(fs.readFileSync(path.join(pulledDir, "result.json"), "utf8")) as { jobs?: JobResult[] }
 		for (const job of result.jobs ?? []) {
 			const output = plan.template.output.replace("{name}", job.name)
 			// The path below out/ on the device, folders and all: a report names renders after their script's path.
-			const pulled = path.join(staging, "out", path.relative(`${runDir}/out`, job.output))
+			const pulled = path.join(pulledDir, "out", path.relative(`${runDir}/out`, job.output))
 			if (job.ok && fs.existsSync(pulled)) {
 				fs.mkdirSync(path.dirname(output), { recursive: true })
 				fs.copyFileSync(pulled, output)
@@ -312,7 +336,7 @@ const stepTimer = (verbose: boolean) => {
 
 const runOnPool = async (config: RunnerConfig, plan: Plan) => {
 	const step = stepTimer(Boolean(plan.verbose))
-	const slot = await acquireSlot(config.pool, config.emulators)
+	const slot = await acquireSlot(config.pool, config.emulators, displayOf(plan).key)
 	step(`slot ${slot.index}`)
 	const stateFile = path.join(config.pool, `slot-${slot.index}.json`)
 	let state = readState(stateFile)
@@ -329,23 +353,22 @@ const runOnPool = async (config: RunnerConfig, plan: Plan) => {
 			}
 			state.apk = config.apkKey
 		}
-		await configureDisplay(config, state, plan)
-		await resetHost(config, state)
-		step("display and reset")
 		const runDir = `${DEVICE_ROOT}/run-${process.pid}-${Date.now()}`
-		await startHost(config, state, plan, runDir)
-		step("push and start")
-		// The bundle is on the device and the host starting: what is left is the render the time limit is for.
+		await configureDisplay(config, state, plan)
+		await resetHost(config, state, runDir)
+		step("display and reset")
+		await pushPlan(config, state, plan, runDir)
+		step("push")
+		// The bundle is on the device: what is left is the render the time limit is for.
 		process.stdout.write(`${READY_LINE}\n`)
-		const reported = await waitForResult(config, state, runDir)
+		const reported = await runHost(config, state, runDir)
 		step("run")
 		if (reported) {
 			await collect(config, state, plan, runDir)
-			step("collect")
 		} else {
-			process.stderr.write(`${(await logcat(config, state)).slice(-40).join("\n")}\n`)
+			process.stderr.write(`${(await finishRun(config, state, runDir)).slice(-40).join("\n")}\n`)
 		}
-		await shell(config.sdk, state.serial, `am force-stop ${HOST_PACKAGE}; rm -rf ${runDir}`)
+		step("collect")
 		return reported ? 0 : 1
 	} finally {
 		if (state) {
@@ -378,9 +401,11 @@ const runInteractive = async (config: RunnerConfig, plan: Plan) => {
 	await checkSnapshotLoaded(config, serial, emulator, path.join(config.pool, `emulator-show-${process.pid}.log`))
 	await setAnimations(config.sdk, serial, true)
 	const state: SlotState = { serial, pid: emulator.pid ?? 0, apk: config.apkKey, pushed: {} }
+	const runDir = `${DEVICE_ROOT}/run-show-${process.pid}`
 	await configureDisplay(config, state, plan)
-	await resetHost(config, state)
-	await startHost(config, state, plan, `${DEVICE_ROOT}/run-show-${process.pid}`)
+	await resetHost(config, state, runDir)
+	await pushPlan(config, state, plan, runDir)
+	await shell(config.sdk, serial, startCommand(runDir))
 	// Messages only, as the macOS host prints them; show relays them and maps stacks back to the source.
 	const logs = spawn(config.sdk.adb, ["-s", serial, "logcat", "-v", "raw", ...LOG_FILTER], {
 		stdio: ["ignore", "inherit", "inherit"],

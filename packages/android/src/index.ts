@@ -92,6 +92,8 @@ const prepare = async (project: Project, { log, verbose }: RendererContext) => {
 		linked: linked.map((pkg) => pkg.jsName),
 		excluded: excluded.filter((pkg) => pkg.kind === "react-native").map((pkg) => ({ name: pkg.jsName, dir: pkg.root })),
 		stubbedNativeModules: excluded.filter((pkg) => pkg.kind === "expo").flatMap(expoModuleNames),
+		// Hermes on an emulator takes about a second to compile an app's bundle, at every render's start.
+		bytecode: true,
 		launch: (plan: string, options: { locale?: string; timeZone?: string }) => {
 			const runnerConfig = path.join(path.dirname(plan), `${path.basename(plan, ".json")}-android.json`)
 			fs.writeFileSync(runnerConfig, JSON.stringify({ ...config, locale: options.locale, timeZone: options.timeZone }))

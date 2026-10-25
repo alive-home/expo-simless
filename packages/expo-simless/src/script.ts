@@ -186,7 +186,10 @@ export const runScript = async (
 	// Variants whose first process ended before it listed the script's renders, so none of theirs were performed.
 	const unlisted: Array<{ variant: Variant; error: string }> = []
 	const workers = Math.max(1, Math.min(Math.floor(os.availableParallelism() / 2), script.host.concurrency ?? Infinity))
-	const queue: Array<() => Promise<void>> = []
+	// What is left to run, each for one variant. A worker that finishes a variant's render takes another of the same
+	// variant first: a renderer that reconfigures a device per variant (an Android emulator's display size, density
+	// and night mode, which costs seconds the first time) then does so once per variant rather than at every render.
+	const queue: Array<{ variant: Variant; run: () => Promise<void> }> = []
 	const startVariant = (variant: Variant) => async () => {
 		if (script.shared) {
 			record(
@@ -209,35 +212,43 @@ export const runScript = async (
 			const indexInGroup = seenInGroup.get(group) ?? 0
 			seenInGroup.set(group, indexInGroup + 1)
 			if (isWanted(name, script.only) && !done.has(index)) {
-				queue.push(async () => {
-					const result = await runProcess(script, variant, {
-						group,
-						indices: [indexInGroup],
-						patterns: null,
-						limit: 1,
-					})
-					if (result.jobs.length === 0) {
-						const error = result.error ?? first.error ?? "the host did not report this render"
-						record(variant, { ...result, jobs: [unreported(script, variant, name, index, error)], error: undefined })
-						return
-					}
-					// A script error in a process that only replays the run up to its render repeats the first one's.
-					record(variant, first.error ? { ...result, error: undefined } : result)
+				queue.push({
+					variant,
+					run: async () => {
+						const result = await runProcess(script, variant, {
+							group,
+							indices: [indexInGroup],
+							patterns: null,
+							limit: 1,
+						})
+						if (result.jobs.length === 0) {
+							const error = result.error ?? first.error ?? "the host did not report this render"
+							record(variant, { ...result, jobs: [unreported(script, variant, name, index, error)], error: undefined })
+							return
+						}
+						// A script error in a process that only replays the run up to its render repeats the first one's.
+						record(variant, first.error ? { ...result, error: undefined } : result)
+					},
 				})
 			}
 		})
 	}
-	queue.push(...variants.map(startVariant))
+	queue.push(...variants.map((variant) => ({ variant, run: startVariant(variant) })))
 	let running = 0
 	await new Promise<void>((resolve, reject) => {
-		const next = () => {
+		const take = (after?: Variant) => {
+			const same = after ? queue.findIndex((task) => task.variant === after) : -1
+			return queue.splice(Math.max(same, 0), 1)[0]
+		}
+		const next = (after?: Variant) => {
 			while (running < workers && queue.length > 0) {
-				const task = queue.shift()
+				const task = take(after)
+				after = undefined
 				if (task) {
 					running += 1
-					task().then(() => {
+					task.run().then(() => {
 						running -= 1
-						next()
+						next(task.variant)
 					}, reject)
 				}
 			}

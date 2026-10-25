@@ -28,6 +28,8 @@ export type BundleOptions = {
 	// The moment `Date` starts at, in milliseconds since the epoch; undefined for the real time.
 	clock?: number
 	dev: boolean
+	// Compile the bundle to Hermes bytecode, for a host whose Hermes would otherwise compile it at every start.
+	bytecode: boolean
 	verbose: boolean
 	log: (line: string) => void
 }
@@ -306,8 +308,46 @@ export const releaseWorkDir = (workDir: string, keep: boolean | undefined, log: 
 export type Bundle = {
 	bundlePath: string
 	sourceMapPath: string
+	// For a bytecode bundle, from its bytecode offsets to the lines of the JavaScript that sourceMapPath maps.
+	bytecodeMapPath?: string
 	// Package name to the file that replaced it, for the packages the bundle actually imported.
 	mocked: Record<string, string>
+}
+
+// React Native's Hermes compiler: in hermes-compiler since 0.83, in react-native/sdks before.
+const findHermesc = (project: Project): string | null => {
+	const platformDir = process.platform === "darwin" ? "osx-bin" : "linux64-bin"
+	try {
+		const reactNative = path.dirname(expoRequire(project.root).resolve("react-native/package.json"))
+		const candidates = [path.join(reactNative, "sdks", "hermesc", platformDir, "hermesc")]
+		try {
+			const compiler = path.dirname(createRequire(reactNative + path.sep).resolve("hermes-compiler/package.json"))
+			candidates.unshift(path.join(compiler, "hermesc", platformDir, "hermesc"))
+		} catch {
+			// An older React Native, with hermesc in its own sdks folder.
+		}
+		return candidates.find((file) => fs.existsSync(file)) ?? null
+	} catch {
+		return null
+	}
+}
+
+// Replaces the bundle with its Hermes bytecode, which a host loads without parsing the source: about a second less
+// at every render's start on an emulator. Unoptimized: optimizing takes seconds per run and gains no start time.
+// Says where the bytecode's source map went, or nothing when the source stays (no hermesc found).
+const compileBytecode = async (project: Project, bundlePath: string, workDir: string, options: BundleOptions) => {
+	const hermesc = findHermesc(project)
+	if (!hermesc) {
+		if (options.verbose) {
+			options.log("No hermesc in the project's React Native: the bundle stays JavaScript")
+		}
+		return undefined
+	}
+	const compiled = path.join(workDir, "main.hbc")
+	await runOrThrow(hermesc, ["-emit-binary", "-O0", "-output-source-map", "-out", compiled, bundlePath])
+	fs.renameSync(compiled, bundlePath)
+	// Beside the source map, not in the bundle folder, which goes to the device.
+	return `${compiled}.map`
 }
 
 // Bundles `script`, a module whose default export is an async function calling render(), with the runtime.
@@ -355,5 +395,6 @@ export const bundleScript = async (
 			.filter(Boolean)
 			.map((line) => JSON.parse(line) as [string, string]),
 	)
-	return { bundlePath, sourceMapPath, mocked }
+	const bytecodeMapPath = options.bytecode ? await compileBytecode(project, bundlePath, workDir, options) : undefined
+	return { bundlePath, sourceMapPath, bytecodeMapPath, mocked }
 }

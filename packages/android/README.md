@@ -32,15 +32,20 @@ renderer runs the real thing on an emulator and keeps that fast:
    bundle runs: the same `mount`, `ready`, `fail`, `result`, `done` contract as the macOS host, so render scripts and
    the runtime are shared.
 3. **The emulator** is simless's own AVD (`~/Library/Caches/simless/android/avd`, apart from Android Studio's),
-   booted once, set up (gesture navigation, no lock screen, animations off, adbd as root, SELinux permissive) and
-   saved as a snapshot; then booted once more to install the host APK and saved again. A run boots that snapshot
+   booted once, set up (gesture navigation, no lock screen, animations off, adbd as root, SELinux permissive, the
+   image's Google apps that renders never use turned off, which saves each emulator some 700 MB) and saved as a
+   snapshot; then booted once more to install the host APK and saved again. A run boots that snapshot
    read-only in under two seconds, with the host already installed. Each app keeps a host snapshot of its own (up
    to four, unused ones dropped after 14 days). Saving one boots the AVD writable, which the emulator allows only
    while no other instance has it open: it waits for other runs' emulators to close, and their new ones wait for it.
 4. **A run.** The CLI starts `src/runner.ts` per plan in place of a host process. It takes an emulator from the run's
-   pool (two by default, `SIMLESS_ANDROID_EMULATORS` to change), sets the device preset with `wm size` and
+   pool (two by default, `SIMLESS_ANDROID_EMULATORS` to change), preferring one that already shows the plan's
+   device and appearance (the first switch to one costs an emulator seconds; the CLI also hands a runner's next
+   render out on the same device), sets the device preset with `wm size` and
    `wm density`, the appearance with `cmd uimode`, the locale per app and the time zone, clears the host's data, pushes
-   the bundle (once per emulator) and the plan, starts the activity, and pulls the result and PNGs back. Emulators
+   the bundle (once per emulator) and the plan, starts the activity and waits for it on the device, and pulls the
+   result and PNGs back. The bundle is Hermes bytecode, compiled once per run with the project's `hermesc`, so the
+   host does not compile the JavaScript at every render's start. Emulators
    stay up for the next render and stop when the CLI does. The CLI starts no more runners than there are emulators,
    and a render's time limit starts once its runner has an emulator set up and the bundle pushed, not while it
    waits for one, boots it or pushes to it.
@@ -61,5 +66,3 @@ lists them; `WIDTHxHEIGHT@SCALE` in dp works too.
 
 - What config plugins write into an app's Android project (manifest entries, string resources, Gradle properties)
   is not in the host: modules that read their settings from there run on their defaults.
-- The bundle is plain JavaScript, not Hermes bytecode, so a render's app start is about a second slower than a
-  release build's.

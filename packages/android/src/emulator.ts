@@ -14,10 +14,12 @@ export const DEVICE_ROOT = "/data/local/tmp/simless"
 export const READY_LINE = "simless android: ready"
 
 // The state every run starts from: booted, adbd running as root, SELinux permissive (so the host reads what the
-// runner pushes to /data/local/tmp), gesture navigation, no lock screen, animations off.
-export const BASE_SNAPSHOT = "simless"
+// runner pushes to /data/local/tmp), gesture navigation, no lock screen, animations off, Google's apps off. A new
+// version when that changes, so it is made again.
+const BASE_VERSION = 2
+export const BASE_SNAPSHOT = `simless-${BASE_VERSION}`
 // The base with a host APK installed, one per APK; booting it skips the install.
-export const hostSnapshotOf = (apkKey: string) => `host-${apkKey}`
+export const hostSnapshotOf = (apkKey: string) => `host-${BASE_VERSION}-${apkKey}`
 const BOOT_TIMEOUT_MS = 180_000
 const POLL_MS = 100
 
@@ -159,6 +161,43 @@ const SETUP = [
 	"settings put global package_verifier_enable 0",
 	"settings put global verifier_verify_adb_installs 0",
 ]
+
+// Apps a Google APIs image runs that no render needs. Idle, they fill most of the emulator's 2 GB, so it swaps while
+// a render starts, and each emulator takes some 700 MB more of the Mac's memory. Chrome stays (it can be the
+// WebView), as does text to speech. Those an image does not have are skipped.
+const UNUSED_APPS = [
+	"com.google.android.settings.intelligence",
+	"com.google.android.googlequicksearchbox",
+	"com.google.android.dialer",
+	"com.google.android.apps.messaging",
+	"com.google.android.as",
+	"com.google.android.as.oss",
+	"com.google.android.apps.wellbeing",
+	"com.google.android.configupdater",
+	"com.google.android.documentsui",
+	"com.google.android.apps.safetyhub",
+	"com.google.android.marvin.talkback",
+	"com.google.android.deskclock",
+	"com.google.android.accessibility.switchaccess",
+	"com.google.android.cellbroadcastreceiver",
+	"com.google.android.partnersetup",
+	"com.google.android.apps.photos",
+	"com.google.android.youtube",
+	"com.google.android.apps.youtube.music",
+	"com.google.android.apps.maps",
+	"com.google.android.calendar",
+	"com.google.android.contacts",
+	"com.google.android.gm",
+	"com.google.android.apps.docs",
+	"com.google.android.videos",
+]
+
+const disableUnusedApps = (sdk: AndroidSdk, serial: string) =>
+	shell(
+		sdk,
+		serial,
+		`for app in ${UNUSED_APPS.join(" ")}; do pm disable-user --user 0 $app > /dev/null 2>&1; am force-stop $app; done; true`,
+	)
 
 const snapshotsDir = (sdk: AndroidSdk) => path.join(avdHome(), `${avdNameOf(sdk)}.avd`, "snapshots")
 
@@ -350,8 +389,17 @@ export const ensureHostSnapshot = async (
 			prepare: async (serial) => {
 				await shell(sdk, serial, SETUP.join("; "))
 				await setAnimations(sdk, serial, false)
+				await disableUnusedApps(sdk, serial)
 				// Lets the launcher and SystemUI finish what the first boot starts, so the snapshot is of a quiet device.
 				await sleep(5000)
+			},
+			// The bases of earlier versions, about a gigabyte each; their host snapshots are pruned as unused.
+			afterSave: () => {
+				for (const entry of fs.readdirSync(snapshotsDir(sdk))) {
+					if (/^simless(-\d+)?$/.test(entry) && entry !== BASE_SNAPSHOT) {
+						fs.rmSync(path.join(snapshotsDir(sdk), entry), { recursive: true, force: true })
+					}
+				}
 			},
 		},
 		log,

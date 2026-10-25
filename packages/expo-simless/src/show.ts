@@ -29,7 +29,7 @@ export const showScript = async (session: ShowSession): Promise<void> => {
 	const startedAt = Date.now()
 	const bundle = await bundleScript(project, [{ group: "", file: session.script }], workDir, session.bundleOptions)
 	const seconds = ((Date.now() - startedAt) / 1000).toFixed(1)
-	const symbolicate = symbolicator(bundle.sourceMapPath, project.root)
+	const symbolicate = symbolicator(bundle.sourceMapPath, project.root, bundle.bytecodeMapPath)
 
 	const planPath = path.join(workDir, "plan-show.json")
 	fs.writeFileSync(
