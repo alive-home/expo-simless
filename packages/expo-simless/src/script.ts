@@ -130,10 +130,11 @@ const runProcess = async (script: ScriptRun, variant: Variant, selection: Select
 		home: path.join(script.workDir, `home-${index}`),
 	})
 	const renders = selection.limit ?? selection.indices?.length ?? 1
+	const limitMs = script.shared ? SHARED_PROCESS_LIMIT_MS : STARTUP_ALLOWANCE_MS + renders * script.defaults.timeoutMs
 	const child = await run(launch.command, launch.args, {
 		env: launch.env,
 		inherit: script.verbose,
-		timeoutMs: script.shared ? SHARED_PROCESS_LIMIT_MS : STARTUP_ALLOWANCE_MS + renders * script.defaults.timeoutMs,
+		timeoutMs: limitMs,
 		readyLine: launch.readyLine,
 		readyLimitMs: READY_LIMIT_MS,
 	})
@@ -145,7 +146,11 @@ const runProcess = async (script: ScriptRun, variant: Variant, selection: Select
 	return {
 		jobs: [],
 		names: [],
-		error: `the host exited (code ${child.code}) before reporting${tail ? `:\n${tail}` : ""}`,
+		error: `${
+			child.timedOut
+				? `the host ran past its time limit (${Math.round(limitMs / 1000)} s${launch.readyLine ? " once ready" : ""}) and was ended`
+				: `the host exited (code ${child.code})`
+		} before reporting${tail ? `:\n${tail}` : ""}`,
 	}
 }
 

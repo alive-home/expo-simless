@@ -49,6 +49,8 @@ export type RunResult = {
 	code: number
 	stdout: string
 	stderr: string
+	// Ended by its time limit.
+	timedOut?: boolean
 }
 
 export const run = (command: string, args: string[], options: RunOptions = {}): Promise<RunResult> =>
@@ -72,7 +74,11 @@ export const run = (command: string, args: string[], options: RunOptions = {}): 
 				process.stderr.write(chunk)
 			}
 		})
-		const kill = () => child.kill("SIGKILL")
+		let timedOut = false
+		const kill = () => {
+			timedOut = true
+			child.kill("SIGKILL")
+		}
 		const startTimer = (ms: number | undefined) => (ms ? setTimeout(kill, ms) : null)
 		let ready = !options.readyLine
 		let timer = startTimer(ready ? options.timeoutMs : options.readyLimitMs)
@@ -92,7 +98,7 @@ export const run = (command: string, args: string[], options: RunOptions = {}): 
 			if (timer) {
 				clearTimeout(timer)
 			}
-			resolve({ code: code ?? (signal ? 128 : 1), stdout, stderr })
+			resolve({ code: code ?? (signal ? 128 : 1), stdout, stderr, timedOut })
 		})
 	})
 
