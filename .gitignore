@@ -3,3 +3,4 @@ simless-output/
 *.tsbuildinfo
 dist/
 .claude/worktrees/
+.DS_Store
