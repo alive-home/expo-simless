@@ -111,6 +111,10 @@ export const loadProject = async (root: string): Promise<Project> => {
 		throw new Error(`${root} is not an Expo app: its package.json does not depend on expo.`)
 	}
 	const { config, configPath } = await loadConfig(root)
+	// Where the shared cache goes for this project; SIMLESS_CACHE, set by hand, wins.
+	if (config.cacheDir && !process.env.SIMLESS_CACHE) {
+		process.env.SIMLESS_CACHE = path.resolve(root, config.cacheDir)
+	}
 	const appConfig = await readAppConfig(root)
 	return { root, config, configPath, appConfig, lockedAppearance: lockedAppearanceOf(appConfig) }
 }

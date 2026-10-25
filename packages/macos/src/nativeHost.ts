@@ -6,8 +6,10 @@ import {
 	cacheRoot,
 	expoRequire,
 	hashOf,
+	markUsed,
 	NODE,
 	type Project,
+	pruneUnused,
 	run,
 	runOrThrow,
 } from "@alivelabs/expo-simless/renderer"
@@ -67,6 +69,13 @@ export type NativeHost = {
 }
 
 type Log = (line: string) => void
+
+// Marks the host this run takes as used, and deletes the ones no run has taken for a while: a host is built per
+// native fingerprint, so every native dependency change leaves one behind.
+const useHost = (appPath: string) => {
+	markUsed(appPath)
+	pruneUnused(path.dirname(appPath), (name) => /^SimlessHost-\w+\.app$/.test(name), [appPath])
+}
 
 const hostDirOf = (project: Project) => path.join(project.root, "node_modules", ".cache", "simless", "native-host")
 
@@ -431,6 +440,7 @@ const buildNativeHost = async (
 		const executable = path.join(appPath, "Contents", "MacOS", "SimlessHost")
 		if (fs.existsSync(executable)) {
 			await applyInfoPlist(appPath, project.appConfig)
+			useHost(appPath)
 			return result(executable)
 		}
 
@@ -441,6 +451,7 @@ const buildNativeHost = async (
 				await recordHostInfoPlist(scratch)
 			})
 			await applyInfoPlist(appPath, project.appConfig)
+			useHost(appPath)
 			return result(executable)
 		}
 

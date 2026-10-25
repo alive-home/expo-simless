@@ -4,6 +4,8 @@ import {
 	buildAtomically,
 	cacheRoot,
 	hashOf,
+	markUsed,
+	pruneUnused,
 	type RendererContext,
 	runOrThrow,
 	type SwiftUIRequest,
@@ -59,6 +61,9 @@ const ensureSwiftUIHost = async (
 	])
 	const appPath = path.join(cacheRoot(), "swiftui", `${EXECUTABLE}-${key}.app`)
 	const executable = path.join(appPath, "Contents", "MacOS", EXECUTABLE)
+	// One app per set of Swift sources and views, so each edit leaves one behind: the unused ones go.
+	markUsed(appPath)
+	pruneUnused(path.dirname(appPath), (name) => name.startsWith(`${EXECUTABLE}-`) && name.endsWith(".app"), [appPath])
 	if (fs.existsSync(executable)) {
 		return executable
 	}

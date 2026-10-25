@@ -316,15 +316,21 @@ const markdown = (report: Report): string => {
 	return lines.join("\n")
 }
 
+// Marks a folder as a report's from the start of the run, so one that stopped halfway (no report.json yet) is
+// still recognized as simless's own and emptied by the next.
+const REPORT_MARKER = ".simless-report"
+
 // The folder holds only a report: it is emptied first, so a render that is gone leaves no stale image behind.
 export const prepareReportDir = (outDir: string) => {
 	if (fs.existsSync(outDir) && fs.readdirSync(outDir).length > 0) {
-		if (!fs.existsSync(path.join(outDir, "report.json"))) {
+		const isReport = ["report.json", REPORT_MARKER].some((file) => fs.existsSync(path.join(outDir, file)))
+		if (!isReport) {
 			throw new Error(`${outDir} is not empty and holds no earlier report; pick another --out`)
 		}
 		fs.rmSync(outDir, { recursive: true, force: true })
 	}
 	fs.mkdirSync(outDir, { recursive: true })
+	fs.writeFileSync(path.join(outDir, REPORT_MARKER), "")
 }
 
 export const writeReport = async (input: ReportInput): Promise<{ html: string; markdown: string; report: Report }> => {

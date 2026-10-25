@@ -1,6 +1,7 @@
 import fs from "node:fs"
 import { createRequire } from "node:module"
 import path from "node:path"
+import { KEEP_MARKER, projectCacheDir, pruneStaleRuns } from "./cache.ts"
 import { expoRequire } from "./expo.ts"
 import { NODE, PACKAGE_ROOT, runOrThrow } from "./process.ts"
 import type { Project } from "./project.ts"
@@ -283,11 +284,23 @@ module.exports = async (defaults) => {
 // The work directory sits in the project's node_modules so the generated entry resolves `react` and
 // `react-native` (and the project's own modules) exactly as the app does. The runtime is copied in for the same
 // reason.
+// Work directories that earlier runs left behind when they were killed go first.
 export const createWorkDir = (project: Project): string => {
-	const workDir = path.join(project.root, "node_modules", ".cache", "simless", `run-${process.pid}-${Date.now()}`)
+	pruneStaleRuns(project.root)
+	const workDir = path.join(projectCacheDir(project.root), `run-${process.pid}-${Date.now()}`)
 	fs.mkdirSync(workDir, { recursive: true })
 	fs.cpSync(path.join(PACKAGE_ROOT, "runtime"), workDir, { recursive: true })
 	return workDir
+}
+
+// Deletes the work directory at the end of a run, or with --keep marks it to be kept.
+export const releaseWorkDir = (workDir: string, keep: boolean | undefined, log: (line: string) => void) => {
+	if (keep) {
+		fs.writeFileSync(path.join(workDir, KEEP_MARKER), "")
+		log(`Kept ${workDir}`)
+	} else {
+		fs.rmSync(workDir, { recursive: true, force: true })
+	}
 }
 
 export type Bundle = {

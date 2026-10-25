@@ -98,6 +98,12 @@ export type SimlessConfig = {
 	fit?: boolean
 	/** Default for every render, in points. */
 	padding?: number
+	/**
+	 * Where simless keeps what every checkout of the app shares: the built hosts and the Android emulator. Relative to
+	 * the project, e.g. `node_modules/.cache/simless/shared` to keep it all with the project (for CI, which caches
+	 * node_modules). Default `~/Library/Caches/simless`; the `SIMLESS_CACHE` environment variable overrides both.
+	 */
+	cacheDir?: string
 	/** What `simless report` renders, and on what. */
 	report?: {
 		/** Render scripts, as paths or globs relative to the project. Default `simless/**\/*.render.tsx` and kin. */

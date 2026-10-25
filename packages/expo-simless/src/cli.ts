@@ -1,7 +1,15 @@
 import fs from "node:fs"
 import path from "node:path"
 import { parseArgs } from "node:util"
-import { bundleScript, type ComponentTarget, createWorkDir, type ScriptFile, writeComponentScript } from "./bundle.ts"
+import {
+	bundleScript,
+	type ComponentTarget,
+	createWorkDir,
+	releaseWorkDir,
+	type ScriptFile,
+	writeComponentScript,
+} from "./bundle.ts"
+import { type CleanScope, cleanCache, showCache } from "./cacheCommand.ts"
 import { checkTimeZone, clockEpoch } from "./clock.ts"
 import { type Device, resolveDevice } from "./devices.ts"
 import { findProjectRoot, loadProject, type Project, resolveFonts, type SimlessConfig } from "./project.ts"
@@ -33,6 +41,7 @@ Usage
                                                 Open one render in a window you can click, scroll and type in
   simless swiftui <file.swift>... [options]     Render SwiftUI views
   simless devices                               List device presets
+  simless cache [clean [project | all]]         Show what simless caches and where, or remove it
 
 A render script is a module whose default export is an async function:
 
@@ -527,11 +536,7 @@ const runReactNative = async (
 				names = outcome.names
 			}
 		} finally {
-			if (options.keep) {
-				log(`Kept ${workDir}`)
-			} else {
-				fs.rmSync(workDir, { recursive: true, force: true })
-			}
+			releaseWorkDir(workDir, options.keep, log)
 		}
 	}
 	if (renders.length === 0 && errors.length === 0) {
@@ -657,11 +662,7 @@ const showReactNative = async (positionals: string[], options: Options): Promise
 		})
 		return EXIT_OK
 	} finally {
-		if (options.keep) {
-			log(`Kept ${workDir}`)
-		} else {
-			fs.rmSync(workDir, { recursive: true, force: true })
-		}
+		releaseWorkDir(workDir, options.keep, log)
 	}
 }
 
@@ -727,6 +728,34 @@ const listDevices = async (options: Options): Promise<number> => {
 	return EXIT_OK
 }
 
+// The project the command is run in, if any: the cache command also works outside one, for the shared cache.
+const projectRootOrNull = (options: Options) => {
+	try {
+		return findProjectRoot(options.project ? path.resolve(options.project) : process.cwd())
+	} catch {
+		return null
+	}
+}
+
+const cacheCommand = async (positionals: string[], options: Options): Promise<number> => {
+	const [action, scope = "default"] = positionals
+	const root = projectRootOrNull(options)
+	if (root) {
+		// Reads cacheDir from the config.
+		await loadProject(root)
+	}
+	if (action === undefined) {
+		showCache(root)
+		return EXIT_OK
+	}
+	if (action !== "clean" || !["default", "project", "all"].includes(scope)) {
+		log("Usage: simless cache [clean [project | all]]")
+		return EXIT_UNUSABLE
+	}
+	cleanCache(root, scope as CleanScope, log)
+	return EXIT_OK
+}
+
 export const main = async (): Promise<number> => {
 	const { values, positionals } = parse()
 	// Repeating a list flag adds to it, as a comma does: `--device a --device b` is `--device a,b`.
@@ -753,6 +782,9 @@ export const main = async (): Promise<number> => {
 	}
 	if (command === "devices") {
 		return listDevices(options)
+	}
+	if (command === "cache") {
+		return cacheCommand(rest, options)
 	}
 	log(`Unknown command ${command}\n`)
 	process.stdout.write(USAGE)

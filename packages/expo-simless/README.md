@@ -392,15 +392,33 @@ of those classes, or of views of those classes, before the capture: how to find 
 
 ## Caches
 
-Nothing is invalidated: everything cached is stored under a hash of what it was made from, so a change makes a new
-entry and an unchanged project finds the old one.
-- **The native host** is keyed by the app's native fingerprint, from `@expo/fingerprint` (the hash `expo run` and
-  EAS decide rebuilds by): native package versions, pnpm and patch-package patches, the app's local modules,
-  autolinking. The app config is left out of it, since what it changes for the host is the Info.plist, which is
-  written on every run. The Xcode version, the packages left out, and simless's own native sources are part of the
-  key too.
-- **The SwiftUI host** is keyed by your Swift files, the `--view` expressions and the Xcode version.
-- **JS** is bundled on every run; Metro's own cache keeps that to a few seconds.
+```bash
+simless cache                 # what is cached where, and how big
+simless cache clean           # this project's cache and the built hosts
+simless cache clean project   # this project's cache only
+simless cache clean all       # both, and the Android emulator
+```
 
-Built hosts live in `~/Library/Caches/simless` (`SIMLESS_CACHE` overrides it); deleting it is always safe. The
-modules learned not to build for Catalyst are in `node_modules/.cache/simless/native-host/learned-exclude.json`.
+Everything cached is stored under a hash of what it was made from, so a change makes a new entry and an unchanged
+project finds the old one; nothing needs invalidating. There are two places:
+- **The project**, `node_modules/.cache/simless`, like Vite's `node_modules/.vite`: what one checkout builds and runs
+  from. `native-host/` and `android-host/` are the generated Xcode and Gradle projects with their build intermediates,
+  kept so a native change rebuilds incrementally (a few GB together), and `run-*/` is a run's bundle and plans, deleted
+  when the run ends. One a killed run leaves behind goes at the start of the next run; `--keep` keeps one for good. It
+  all goes with `node_modules`.
+- **Shared by every project**, `~/Library/Caches/simless`: the finished hosts and the Android emulator. A host is
+  keyed by the app's native fingerprint (from `@expo/fingerprint`, the hash `expo run` and EAS decide rebuilds by:
+  native package versions, patches, local modules, autolinking), the Xcode or SDK version, the packages left out and
+  simless's own native sources; so a second checkout or a worktree of the same app reuses one build instead of
+  compiling for minutes. The SwiftUI host is keyed by your Swift files, the `--view` expressions and the Xcode version.
+  The Android emulator is one per machine (several GB); a host snapshot of it, with an app's host installed, is kept
+  per app, so two apps do not replace each other's.
+
+Each run marks the hosts and snapshot it takes as used. One no run has used for 14 days
+(`SIMLESS_CACHE_MAX_AGE_DAYS`) is deleted by a later run, and at most four host snapshots are kept. The modules
+learned not to build for Mac Catalyst or Android (`learned-exclude.json` in the project's cache) survive `simless cache
+clean`.
+
+`cacheDir` in the config moves the shared cache, e.g. `node_modules/.cache/simless/shared` to keep everything with the
+project, for CI that caches `node_modules`; `SIMLESS_CACHE` overrides both. Deleting any of it is always safe: it is
+built again when needed.

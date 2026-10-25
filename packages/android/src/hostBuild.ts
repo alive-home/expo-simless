@@ -1,7 +1,7 @@
 import fs from "node:fs"
 import path from "node:path"
 import { fileURLToPath } from "node:url"
-import { cacheRoot, hashOf, type Project, run } from "@alivelabs/expo-simless/renderer"
+import { cacheRoot, hashOf, markUsed, type Project, pruneUnused, run } from "@alivelabs/expo-simless/renderer"
 import { nativeFingerprint } from "./fingerprint.ts"
 import type { NativePackage } from "./nativePackages.ts"
 import { type AndroidSdk, sdkEnv } from "./sdk.ts"
@@ -141,6 +141,13 @@ export type HostApk = { apk: string; key: string }
 
 // The host APK for this project's native modules minus `exclude`, built once and kept under its fingerprint. A
 // module that fails to compile is left out and the build tried again, as the macOS host does.
+// Marks the APK this run takes as used, and deletes the ones no run has taken for a while: one is built per native
+// fingerprint, so every native dependency change leaves one behind.
+const useApk = (apk: string) => {
+	markUsed(apk)
+	pruneUnused(path.dirname(apk), (name) => /^SimlessHost-\w+\.apk$/.test(name), [apk])
+}
+
 export const ensureHostApk = async (
 	project: Project,
 	packages: NativePackage[],
@@ -157,6 +164,7 @@ export const ensureHostApk = async (
 		const key = hashOf([fingerprint, sdk.abi, JSON.stringify(exclude), ...template.flat()])
 		const apk = path.join(cacheRoot(), "android", `SimlessHost-${key}.apk`)
 		if (fs.existsSync(apk)) {
+			useApk(apk)
 			return { apk, key, exclude }
 		}
 		const build = await buildHost(project, exclude, sdk, attempt, log, verbose)
@@ -166,6 +174,7 @@ export const ensureHostApk = async (
 			fs.mkdirSync(path.dirname(apk), { recursive: true })
 			fs.copyFileSync(build.apk, partial)
 			fs.renameSync(partial, apk)
+			useApk(apk)
 			return { apk, key, exclude }
 		}
 		const requiredGradle = /Minimum supported Gradle version is ([\d.]+)/.exec(build.output)?.[1]

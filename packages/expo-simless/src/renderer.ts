@@ -7,6 +7,7 @@ import type { Project } from "./project.ts"
 // What a renderer package (@alivelabs/expo-simless-macos, @alivelabs/expo-simless-android) builds on. The CLI bundles the app's
 // JavaScript, writes plans and reads results; a renderer builds the native host that runs them.
 
+export { markUsed, pruneUnused } from "./cache.ts"
 export type { Device, Insets } from "./devices.ts"
 export { type AppConfig, expoRequire } from "./expo.ts"
 export {
