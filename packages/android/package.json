@@ -1,6 +1,6 @@
 {
 	"name": "@alivelabs/expo-simless-android",
-	"version": "0.1.0-alpha.2",
+	"version": "0.1.0-alpha.3",
 	"description": "The expo-simless renderer for Android: draws with Android's own views on an emulator booted from a snapshot.",
 	"license": "MIT",
 	"repository": {
