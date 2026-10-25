@@ -15,6 +15,7 @@ import {
 	freePort,
 	HOST_ACTIVITY,
 	HOST_PACKAGE,
+	hasSnapshot,
 	READY_LINE,
 	setAnimations,
 	shell,
@@ -112,8 +113,19 @@ const readState = (file: string): SlotState | null => {
 const isBooted = async (sdk: AndroidSdk, serial: string) =>
 	(await adb(sdk, serial, ["shell", "getprop", "sys.boot_completed"], 5_000)).stdout.trim() === "1"
 
+// The emulator boots without the snapshot it is given when that is gone, and then has no host installed.
+const checkSnapshot = (config: RunnerConfig) => {
+	if (!hasSnapshot(config.sdk, config.snapshot)) {
+		throw new Error(
+			`the emulator snapshot ${config.snapshot} is gone, deleted by another simless run (an older version deletes ` +
+				"every app's but its own); run again to make it",
+		)
+	}
+}
+
 const bootSlot = async (config: RunnerConfig, index: number): Promise<SlotState> => {
 	await waitForSnapshotWriter(config.sdk)
+	checkSnapshot(config)
 	const port = await freePort(5600 + index * 2)
 	const serial = `emulator-${port}`
 	const emulator = bootEmulator(config.sdk, port, {
@@ -323,6 +335,7 @@ const runOnPool = async (config: RunnerConfig, plan: Plan) => {
 // `simless show`: an emulator with its window, with animations, until the window is closed.
 const runInteractive = async (config: RunnerConfig, plan: Plan) => {
 	await waitForSnapshotWriter(config.sdk)
+	checkSnapshot(config)
 	const port = await freePort(5700)
 	const serial = `emulator-${port}`
 	const emulator = bootEmulator(config.sdk, port, {
