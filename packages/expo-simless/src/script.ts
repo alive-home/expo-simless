@@ -156,7 +156,13 @@ export const listRenders = async (script: ScriptRun, variant: Variant): Promise<
 // over a sheet rendered after it): the first process performs the first wanted render and reports every name, and
 // the rest are spread over parallel processes. React Native reads Dimensions and the color scheme once at startup,
 // so devices and appearances never share a process.
-export const runScript = async (script: ScriptRun, variants: Variant[]): Promise<ScriptOutcome> => {
+// `knownNames` are the renders an earlier run of the same scripts (another platform's) listed, for when no process
+// of this one gets as far as listing them.
+export const runScript = async (
+	script: ScriptRun,
+	variants: Variant[],
+	knownNames: string[] = [],
+): Promise<ScriptOutcome> => {
 	const renders: RenderOutcome[] = []
 	const errors: ScriptError[] = []
 	let names: string[] = []
@@ -234,10 +240,11 @@ export const runScript = async (script: ScriptRun, variants: Variant[]): Promise
 		}
 		next()
 	})
-	// Another variant's first process named the renders: on this one they all failed with its error. With no names at
-	// all (every variant stopped), the script error stands alone.
+	// Another variant's first process named the renders (or an earlier run did): on this one they all failed with its
+	// error. With no names at all, the script error stands alone.
 	for (const { variant, error } of unlisted) {
-		const wanted = names.map((name, index) => ({ name, index })).filter(({ name }) => isWanted(name, script.only))
+		const listed = names.length > 0 ? names : knownNames
+		const wanted = listed.map((name, index) => ({ name, index })).filter(({ name }) => isWanted(name, script.only))
 		record(variant, {
 			names: [],
 			error: wanted.length === 0 ? error : undefined,

@@ -527,7 +527,7 @@ const runReactNative = async (
 			if (mode === "report") {
 				log(`Rendering on ${variants.map(({ device, appearance }) => `${device.name} ${appearance}`).join(", ")}…`)
 			}
-			const outcome = await runScript(script, variants)
+			const outcome = await runScript(script, variants, names)
 			renders.push(
 				...outcome.renders.map((render) => (render.error ? { ...render, error: symbolicate(render.error) } : render)),
 			)
