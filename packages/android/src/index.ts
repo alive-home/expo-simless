@@ -24,26 +24,36 @@ const alive = (pid: number) => {
 	}
 }
 
-// The emulators a run's runners boot into its pool stay up for the next render, and go when the CLI does.
-const createPool = () => {
-	const pool = path.join(androidCacheDir(), "pools", String(process.pid))
-	fs.mkdirSync(pool, { recursive: true })
-	const stop = () => {
-		for (const file of fs.existsSync(pool) ? fs.readdirSync(pool) : []) {
-			if (!/^slot-\d+\.json$/.test(file)) {
-				continue
-			}
-			try {
-				const { pid } = JSON.parse(fs.readFileSync(path.join(pool, file), "utf8")) as { pid: number }
-				if (pid > 0 && alive(pid)) {
-					process.kill(pid, "SIGTERM")
-				}
-			} catch {
-				// A state file being written as the CLI ends; its emulator is the one being booted.
-			}
+// Stops a pool's emulators and deletes it.
+const stopPool = (pool: string) => {
+	for (const file of fs.existsSync(pool) ? fs.readdirSync(pool) : []) {
+		if (!/^slot-\d+\.json$/.test(file)) {
+			continue
 		}
-		fs.rmSync(pool, { recursive: true, force: true })
+		try {
+			const { pid } = JSON.parse(fs.readFileSync(path.join(pool, file), "utf8")) as { pid: number }
+			if (pid > 0 && alive(pid)) {
+				process.kill(pid, "SIGTERM")
+			}
+		} catch {
+			// A state file being written as the CLI ends; its emulator is the one being booted.
+		}
 	}
+	fs.rmSync(pool, { recursive: true, force: true })
+}
+
+// The emulators a run's runners boot into its pool stay up for the next render, and go when the CLI does. A CLI that
+// was killed outright left its pool and emulators behind: the next run stops them.
+const createPool = () => {
+	const pools = path.join(androidCacheDir(), "pools")
+	for (const name of fs.existsSync(pools) ? fs.readdirSync(pools) : []) {
+		if (/^\d+$/.test(name) && !alive(Number(name))) {
+			stopPool(path.join(pools, name))
+		}
+	}
+	const pool = path.join(pools, String(process.pid))
+	fs.mkdirSync(pool, { recursive: true })
+	const stop = () => stopPool(pool)
 	process.once("exit", stop)
 	for (const signal of ["SIGINT", "SIGTERM"] as const) {
 		process.once(signal, () => {
