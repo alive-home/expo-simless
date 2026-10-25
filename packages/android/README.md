@@ -34,7 +34,9 @@ renderer runs the real thing on an emulator and keeps that fast:
 3. **The emulator** is simless's own AVD (`~/Library/Caches/simless/android/avd`, apart from Android Studio's),
    booted once, set up (gesture navigation, no lock screen, animations off, adbd as root, SELinux permissive) and
    saved as a snapshot; then booted once more to install the host APK and saved again. A run boots that snapshot
-   read-only in under two seconds, with the host already installed.
+   read-only in under two seconds, with the host already installed. Each app keeps a host snapshot of its own (up
+   to four, unused ones dropped after 14 days). Saving one boots the AVD writable, which the emulator allows only
+   while no other instance has it open: it waits for other runs' emulators to close, and their new ones wait for it.
 4. **A run.** The CLI starts `src/runner.ts` per plan in place of a host process. It takes an emulator from the run's
    pool (two by default, `SIMLESS_ANDROID_EMULATORS` to change), sets the device preset with `wm size` and
    `wm density`, the appearance with `cmd uimode`, the locale per app and the time zone, clears the host's data, pushes

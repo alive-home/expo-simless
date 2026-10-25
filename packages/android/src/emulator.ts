@@ -2,7 +2,7 @@ import { type ChildProcess, execFileSync, spawn } from "node:child_process"
 import fs from "node:fs"
 import net from "node:net"
 import path from "node:path"
-import { run } from "@alivelabs/expo-simless/renderer"
+import { markUsed, pruneUnused, run } from "@alivelabs/expo-simless/renderer"
 import { type AndroidSdk, avdHome, sdkEnv } from "./sdk.ts"
 
 export const HOST_PACKAGE = "dev.simless.host"
@@ -168,19 +168,79 @@ type SnapshotSpec = {
 	from?: string
 	message: string
 	prepare: (serial: string) => Promise<void>
+	// Run once the snapshot is saved, while no emulator has the AVD open.
+	afterSave?: () => void
 }
 
-// Boots, prepares and saves one snapshot of simless's AVD, once. Concurrent runs wait on the one making it.
+const alive = (pid: number) => {
+	try {
+		process.kill(pid, 0)
+		return true
+	} catch (error) {
+		return (error as NodeJS.ErrnoException).code === "EPERM"
+	}
+}
+
+// Held by the run making a snapshot, which boots the AVD writable.
+const snapshotLockOf = (sdk: AndroidSdk) => path.join(avdHome(), `${avdNameOf(sdk)}.lock`)
+
+const lockOwner = (lock: string) =>
+	Number(fs.readFileSync(path.join(lock, "owner"), { encoding: "utf8", flag: "a+" }) || 0)
+
+// Held unless its owner is gone; one just made has no owner yet, and counts as held.
+const isLockHeld = (lock: string) => {
+	if (!fs.existsSync(lock)) {
+		return false
+	}
+	const owner = lockOwner(lock)
+	return owner === 0 || alive(owner)
+}
+
+const takeLock = (lock: string): boolean => {
+	try {
+		fs.mkdirSync(lock)
+	} catch {
+		if (isLockHeld(lock)) {
+			return false
+		}
+		// Its owner was killed while making a snapshot.
+		fs.rmSync(lock, { recursive: true, force: true })
+		return takeLock(lock)
+	}
+	fs.writeFileSync(path.join(lock, "owner"), String(process.pid))
+	return true
+}
+
+// The emulator boots an AVD writable only while no other instance has it open, and an emulator booted meanwhile
+// would start from a snapshot being written; so a run waits for one being made before it boots.
+export const waitForSnapshotWriter = async (sdk: AndroidSdk) => {
+	while (isLockHeld(snapshotLockOf(sdk))) {
+		await sleep(1000)
+	}
+}
+
+// The emulators that have simless's AVD open now: every run's, and `show`'s.
+const openEmulators = (sdk: AndroidSdk) => {
+	try {
+		return execFileSync("pgrep", ["-f", "--", `-avd ${avdNameOf(sdk)} `], { encoding: "utf8" })
+			.split("\n")
+			.filter(Boolean).length
+	} catch {
+		// pgrep exits 1 when nothing matches.
+		return 0
+	}
+}
+
+// Boots, prepares and saves one snapshot of simless's AVD, once. Concurrent runs wait on the one making it, and it
+// waits for the emulators other runs have open, since the AVD only boots writable with none.
 const ensureSnapshot = async (sdk: AndroidSdk, spec: SnapshotSpec, log: (line: string) => void, logFile: string) => {
 	if (hasSnapshot(sdk, spec.name)) {
 		return
 	}
-	const lock = path.join(avdHome(), `${avdNameOf(sdk)}.lock`)
+	const lock = snapshotLockOf(sdk)
 	fs.mkdirSync(avdHome(), { recursive: true })
-	try {
-		fs.mkdirSync(lock)
-	} catch {
-		while (fs.existsSync(lock) && !hasSnapshot(sdk, spec.name)) {
+	if (!takeLock(lock)) {
+		while (isLockHeld(lock) && !hasSnapshot(sdk, spec.name)) {
 			await sleep(1000)
 		}
 		if (!hasSnapshot(sdk, spec.name)) {
@@ -189,6 +249,12 @@ const ensureSnapshot = async (sdk: AndroidSdk, spec: SnapshotSpec, log: (line: s
 		return
 	}
 	try {
+		if (openEmulators(sdk) > 0) {
+			log("Waiting for another simless run's Android emulators to close…")
+			while (openEmulators(sdk) > 0) {
+				await sleep(2000)
+			}
+		}
 		log(spec.message)
 		if (!spec.from) {
 			createAvd(sdk)
@@ -209,13 +275,31 @@ const ensureSnapshot = async (sdk: AndroidSdk, spec: SnapshotSpec, log: (line: s
 			await adb(sdk, serial, ["emu", "kill"], 10_000)
 			emulator.kill()
 		}
+		spec.afterSave?.()
 	} finally {
 		fs.rmSync(lock, { recursive: true, force: true })
 	}
 }
 
+// Host snapshots kept, each about a gigabyte: one per app (or native change) in use, so two apps on one Mac do not
+// replace each other's at every switch.
+const MAX_HOST_SNAPSHOTS = 4
+
+const pruneHostSnapshots = (sdk: AndroidSdk, current: string) => {
+	const dir = snapshotsDir(sdk)
+	pruneUnused(dir, (name) => name.startsWith("host-"), [path.join(dir, current)])
+	const rest = fs
+		.readdirSync(dir)
+		.filter((name) => name.startsWith("host-") && name !== current)
+		.map((name) => ({ name, used: fs.statSync(path.join(dir, name)).mtimeMs }))
+		.sort((a, b) => b.used - a.used)
+	for (const { name } of rest.slice(MAX_HOST_SNAPSHOTS - 1)) {
+		fs.rmSync(path.join(dir, name), { recursive: true, force: true })
+	}
+}
+
 // simless's own AVD, booted once and set up, then the host APK installed on it: the snapshot every run boots from.
-// One host snapshot is kept, the newest; each takes about a gigabyte.
+// Host snapshots no run has booted for a while are deleted when another is made.
 export const ensureHostSnapshot = async (
 	sdk: AndroidSdk,
 	apk: string,
@@ -251,14 +335,11 @@ export const ensureHostSnapshot = async (
 					throw new Error(`adb install failed: ${installed.stderr.trim() || installed.stdout.trim()}`)
 				}
 			},
+			afterSave: () => pruneHostSnapshots(sdk, name),
 		},
 		log,
 		logFile,
 	)
-	for (const entry of fs.readdirSync(snapshotsDir(sdk))) {
-		if (entry.startsWith("host-") && entry !== name) {
-			fs.rmSync(path.join(snapshotsDir(sdk), entry), { recursive: true, force: true })
-		}
-	}
+	markUsed(path.join(snapshotsDir(sdk), name))
 	return name
 }

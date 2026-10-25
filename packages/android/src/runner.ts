@@ -20,6 +20,7 @@ import {
 	shell,
 	sleep,
 	waitForBoot,
+	waitForSnapshotWriter,
 } from "./emulator.ts"
 import type { AndroidSdk } from "./sdk.ts"
 
@@ -112,6 +113,7 @@ const isBooted = async (sdk: AndroidSdk, serial: string) =>
 	(await adb(sdk, serial, ["shell", "getprop", "sys.boot_completed"], 5_000)).stdout.trim() === "1"
 
 const bootSlot = async (config: RunnerConfig, index: number): Promise<SlotState> => {
+	await waitForSnapshotWriter(config.sdk)
 	const port = await freePort(5600 + index * 2)
 	const serial = `emulator-${port}`
 	const emulator = bootEmulator(config.sdk, port, {
@@ -320,6 +322,7 @@ const runOnPool = async (config: RunnerConfig, plan: Plan) => {
 
 // `simless show`: an emulator with its window, with animations, until the window is closed.
 const runInteractive = async (config: RunnerConfig, plan: Plan) => {
+	await waitForSnapshotWriter(config.sdk)
 	const port = await freePort(5700)
 	const serial = `emulator-${port}`
 	const emulator = bootEmulator(config.sdk, port, {
