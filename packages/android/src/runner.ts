@@ -15,6 +15,7 @@ import {
 	freePort,
 	HOST_ACTIVITY,
 	HOST_PACKAGE,
+	READY_LINE,
 	setAnimations,
 	shell,
 	sleep,
@@ -297,6 +298,8 @@ const runOnPool = async (config: RunnerConfig, plan: Plan) => {
 		const runDir = `${DEVICE_ROOT}/run-${process.pid}-${Date.now()}`
 		await startHost(config, state, plan, runDir)
 		step("push and start")
+		// The bundle is on the device and the host starting: what is left is the render the time limit is for.
+		process.stdout.write(`${READY_LINE}\n`)
 		const reported = await waitForResult(config, state, runDir)
 		step("run")
 		if (reported) {

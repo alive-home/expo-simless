@@ -67,6 +67,9 @@ export type HostLaunch = {
 	command: string
 	args: string[]
 	env: NodeJS.ProcessEnv
+	// A line the process prints on stdout once it has what it renders on, when getting that can take a while (an
+	// emulator to free up or boot): its time limit starts then.
+	readyLine?: string
 }
 
 export type NativeHost = {
@@ -79,6 +82,8 @@ export type NativeHost = {
 	// How to start the host on a plan. It writes the plan's result file and exits or, for an interactive plan,
 	// runs until its window is closed.
 	launch: (plan: string, options: HostLaunchOptions) => HostLaunch
+	// How many host processes can run at once, when fewer than the CLI would start (one emulator each).
+	concurrency?: number
 }
 
 export type RendererContext = {

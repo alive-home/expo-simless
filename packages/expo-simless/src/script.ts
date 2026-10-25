@@ -57,6 +57,8 @@ type ProcessResult = {
 const STARTUP_ALLOWANCE_MS = 30_000
 // A shared process performs an unknown number of renders; this is only there to end a script that hangs.
 const SHARED_PROCESS_LIMIT_MS = 30 * 60_000
+// How long a host that says when it is ready (an Android runner waiting for an emulator) may take to get there.
+const READY_LIMIT_MS = 15 * 60_000
 
 export const groupOf = (name: string) => name.slice(0, Math.max(0, name.lastIndexOf("/")))
 
@@ -130,6 +132,8 @@ const runProcess = async (script: ScriptRun, variant: Variant, selection: Select
 		env: launch.env,
 		inherit: script.verbose,
 		timeoutMs: script.shared ? SHARED_PROCESS_LIMIT_MS : STARTUP_ALLOWANCE_MS + renders * script.defaults.timeoutMs,
+		readyLine: launch.readyLine,
+		readyLimitMs: READY_LIMIT_MS,
 	})
 	if (fs.existsSync(resultPath)) {
 		const result = JSON.parse(fs.readFileSync(resultPath, "utf8")) as Partial<ProcessResult>
@@ -168,7 +172,7 @@ export const runScript = async (script: ScriptRun, variants: Variant[]): Promise
 	}
 	// Variants whose first process ended before it listed the script's renders, so none of theirs were performed.
 	const unlisted: Array<{ variant: Variant; error: string }> = []
-	const workers = Math.max(1, Math.floor(os.availableParallelism() / 2))
+	const workers = Math.max(1, Math.min(Math.floor(os.availableParallelism() / 2), script.host.concurrency ?? Infinity))
 	const queue: Array<() => Promise<void>> = []
 	const startVariant = (variant: Variant) => async () => {
 		if (script.shared) {

@@ -40,6 +40,9 @@ export type RunOptions = {
 	// Stream the child's output instead of only returning it.
 	inherit?: boolean
 	timeoutMs?: number
+	// The timeout starts once the child prints this line on stdout; until then it has readyLimitMs.
+	readyLine?: string
+	readyLimitMs?: number
 }
 
 export type RunResult = {
@@ -69,11 +72,21 @@ export const run = (command: string, args: string[], options: RunOptions = {}): 
 				process.stderr.write(chunk)
 			}
 		})
-		const timer = options.timeoutMs
-			? setTimeout(() => {
-					child.kill("SIGKILL")
-				}, options.timeoutMs)
-			: null
+		const kill = () => child.kill("SIGKILL")
+		const startTimer = (ms: number | undefined) => (ms ? setTimeout(kill, ms) : null)
+		let ready = !options.readyLine
+		let timer = startTimer(ready ? options.timeoutMs : options.readyLimitMs)
+		if (options.readyLine) {
+			child.stdout.on("data", () => {
+				if (!ready && stdout.split("\n").includes(options.readyLine as string)) {
+					ready = true
+					if (timer) {
+						clearTimeout(timer)
+					}
+					timer = startTimer(options.timeoutMs)
+				}
+			})
+		}
 		child.on("error", reject)
 		child.on("close", (code, signal) => {
 			if (timer) {

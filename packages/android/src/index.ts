@@ -3,7 +3,7 @@ import path from "node:path"
 import { fileURLToPath } from "node:url"
 import { NODE, type Project, type Renderer, type RendererContext } from "@alivelabs/expo-simless/renderer"
 import { DEFAULT_DEVICE, DEVICES } from "./devices.ts"
-import { ensureHostSnapshot } from "./emulator.ts"
+import { ensureHostSnapshot, READY_LINE } from "./emulator.ts"
 import { DEFAULT_NATIVE_EXCLUDE, ensureHostApk, readLearnedExcludes } from "./hostBuild.ts"
 import { expoModuleNames, resolveNativePackages } from "./nativePackages.ts"
 import type { RunnerConfig } from "./runner.ts"
@@ -85,8 +85,15 @@ const prepare = async (project: Project, { log, verbose }: RendererContext) => {
 		launch: (plan: string, options: { locale?: string; timeZone?: string }) => {
 			const runnerConfig = path.join(path.dirname(plan), `${path.basename(plan, ".json")}-android.json`)
 			fs.writeFileSync(runnerConfig, JSON.stringify({ ...config, locale: options.locale, timeZone: options.timeZone }))
-			return { command: NODE, args: ["--no-warnings", RUNNER, plan, runnerConfig], env: process.env }
+			return {
+				command: NODE,
+				args: ["--no-warnings", RUNNER, plan, runnerConfig],
+				env: process.env,
+				readyLine: READY_LINE,
+			}
 		},
+		// A process per emulator: more would wait for one, and none is worth starting before it can render.
+		concurrency: config.emulators,
 	}
 }
 

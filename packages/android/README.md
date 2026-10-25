@@ -39,7 +39,9 @@ renderer runs the real thing on an emulator and keeps that fast:
    pool (two by default, `SIMLESS_ANDROID_EMULATORS` to change), sets the device preset with `wm size` and
    `wm density`, the appearance with `cmd uimode`, the locale per app and the time zone, clears the host's data, pushes
    the bundle (once per emulator) and the plan, starts the activity, and pulls the result and PNGs back. Emulators
-   stay up for the next render and stop when the CLI does.
+   stay up for the next render and stop when the CLI does. The CLI starts no more runners than there are emulators,
+   and a render's time limit starts once its runner has an emulator set up and the bundle pushed, not while it
+   waits for one, boots it or pushes to it.
 5. **Capture.** `PixelCopy` of the activity's window, so the status and navigation bars are not in the PNG and the
    app's content under them is, as on iOS. A render is settled once nothing has drawn for its settle time; a view
    that draws for good is captured two seconds past it.

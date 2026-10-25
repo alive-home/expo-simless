@@ -9,6 +9,9 @@ export const HOST_PACKAGE = "dev.simless.host"
 export const HOST_ACTIVITY = `${HOST_PACKAGE}/.SimlessActivity`
 // Where the runner keeps bundles, fonts and each run's plan and PNGs on the device.
 export const DEVICE_ROOT = "/data/local/tmp/simless"
+// What the runner prints once it has an emulator set up for its plan, with the bundle on it and the host starting;
+// the CLI's time limit for the render starts then, not while it waits for an emulator, boots one or pushes to it.
+export const READY_LINE = "simless android: ready"
 
 // The state every run starts from: booted, adbd running as root, SELinux permissive (so the host reads what the
 // runner pushes to /data/local/tmp), gesture navigation, no lock screen, animations off.
