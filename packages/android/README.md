@@ -45,8 +45,9 @@ renderer runs the real thing on an emulator and keeps that fast:
    and a render's time limit starts once its runner has an emulator set up and the bundle pushed, not while it
    waits for one, boots it or pushes to it.
 5. **Capture.** `PixelCopy` of the activity's window, so the status and navigation bars are not in the PNG and the
-   app's content under them is, as on iOS. A render is settled once nothing has drawn for its settle time; a view
-   that draws for good is captured two seconds past it.
+   app's content under them is, as on iOS. A render is settled once nothing has drawn, and no image has been
+   decoding (Glide's or Fresco's threads), for its settle time; a view that draws for good is captured two seconds
+   past it.
 
 `show` boots the same snapshot with its window and animations on, and streams the app's log until the window is
 closed.
