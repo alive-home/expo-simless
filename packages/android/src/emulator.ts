@@ -164,6 +164,11 @@ const snapshotsDir = (sdk: AndroidSdk) => path.join(avdHome(), `${avdNameOf(sdk)
 
 export const hasSnapshot = (sdk: AndroidSdk, name: string) => fs.existsSync(path.join(snapshotsDir(sdk), name))
 
+// A snapshot the emulator cannot load (saved under other emulator settings): it boots without it instead, so it
+// goes, and the next run saves it again.
+export const discardSnapshot = (sdk: AndroidSdk, name: string) =>
+	fs.rmSync(path.join(snapshotsDir(sdk), name), { recursive: true, force: true })
+
 const createAvd = (sdk: AndroidSdk) => {
 	fs.mkdirSync(avdHome(), { recursive: true })
 	execFileSync(

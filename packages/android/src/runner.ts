@@ -2,7 +2,7 @@
 // device. Usage: node runner.ts <plan.json> <runner-config.json>. It takes an emulator from the CLI's pool (booting
 // one from simless's snapshot when none is free), pushes the bundle and the plan, starts the host, and pulls the
 // result file and PNGs back to where the plan asked for them.
-import { spawn } from "node:child_process"
+import { type ChildProcess, spawn } from "node:child_process"
 import fs from "node:fs"
 import path from "node:path"
 import { hashOf } from "@alivelabs/expo-simless/renderer"
@@ -11,6 +11,7 @@ import {
 	adb,
 	bootEmulator,
 	DEVICE_ROOT,
+	discardSnapshot,
 	ensureRoot,
 	freePort,
 	HOST_ACTIVITY,
@@ -137,7 +138,29 @@ const bootSlot = async (config: RunnerConfig, index: number): Promise<SlotState>
 	await adb(config.sdk, serial, ["wait-for-device"], 120_000)
 	await waitForBoot(config.sdk, serial, emulator)
 	await ensureRoot(config.sdk, serial)
+	await checkSnapshotLoaded(config, serial, emulator, path.join(config.pool, `emulator-${index}.log`))
 	return { serial, pid: emulator.pid ?? 0, apk: config.apkKey, pushed: {} }
+}
+
+// An emulator that cannot load its snapshot boots without it, with no host installed: then the snapshot goes, with
+// what the emulator said about it, and the next run saves it again.
+const checkSnapshotLoaded = async (config: RunnerConfig, serial: string, emulator: ChildProcess, logFile: string) => {
+	const installed = await adb(config.sdk, serial, ["shell", "pm", "path", HOST_PACKAGE], 10_000)
+	if (installed.stdout.includes("package:")) {
+		return
+	}
+	await adb(config.sdk, serial, ["emu", "kill"], 10_000)
+	emulator.kill()
+	discardSnapshot(config.sdk, config.snapshot)
+	const said = fs
+		.readFileSync(logFile, "utf8")
+		.split("\n")
+		.filter((line) => /snapshot/i.test(line) && /fail|error|created with/i.test(line))
+		.map((line) => line.replace(/^\w+\s+\|\s*/, "").trim())
+	throw new Error(
+		`the emulator could not load the snapshot ${config.snapshot}${said.length > 0 ? ` (${said.join("; ")})` : ""}; ` +
+			"it is deleted, and the next run saves it again",
+	)
 }
 
 // Pushes a file or directory once per emulator, keyed by what it is, and says where it is on the device.
@@ -352,6 +375,7 @@ const runInteractive = async (config: RunnerConfig, plan: Plan) => {
 	await adb(config.sdk, serial, ["wait-for-device"], 120_000)
 	await waitForBoot(config.sdk, serial, emulator)
 	await ensureRoot(config.sdk, serial)
+	await checkSnapshotLoaded(config, serial, emulator, path.join(config.pool, `emulator-show-${process.pid}.log`))
 	await setAnimations(config.sdk, serial, true)
 	const state: SlotState = { serial, pid: emulator.pid ?? 0, apk: config.apkKey, pushed: {} }
 	await configureDisplay(config, state, plan)
