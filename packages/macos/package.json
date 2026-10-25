@@ -1,6 +1,6 @@
 {
 	"name": "@alivelabs/expo-simless-macos",
-	"version": "0.1.0-alpha.1",
+	"version": "0.1.0-alpha.2",
 	"description": "The expo-simless renderer for iOS: draws with the iOS UIKit a Mac runs through Mac Catalyst.",
 	"license": "MIT",
 	"repository": {
