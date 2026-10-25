@@ -3,7 +3,7 @@ import fs from "node:fs"
 import net from "node:net"
 import path from "node:path"
 import { markUsed, pruneUnused, run } from "@alivelabs/expo-simless/renderer"
-import { type AndroidSdk, avdHome, sdkEnv } from "./sdk.ts"
+import { type AndroidSdk, androidCacheDir, avdHome, sdkEnv } from "./sdk.ts"
 
 export const HOST_PACKAGE = "dev.simless.host"
 export const HOST_ACTIVITY = `${HOST_PACKAGE}/.SimlessActivity`
@@ -45,11 +45,36 @@ const portFree = (port: number) =>
 		server.listen(port, "127.0.0.1", () => server.close(() => resolve(true)))
 	})
 
+// A port pair is reserved by a lock directory whose owner is the runner that took it, then the emulator booted on
+// it: two runs booting at once would otherwise both find the same pair free, and adb would send both runs' commands
+// to one emulator. A lock whose owner is gone is free again.
+const portLockOf = (port: number) => path.join(androidCacheDir(), "ports", `${port}.lock`)
+
+const reservePort = (port: number) => {
+	const lock = portLockOf(port)
+	fs.mkdirSync(path.dirname(lock), { recursive: true })
+	try {
+		fs.mkdirSync(lock)
+	} catch {
+		const owner = lockOwner(lock)
+		if (owner === 0 || alive(owner)) {
+			return false
+		}
+		fs.rmSync(lock, { recursive: true, force: true })
+		return reservePort(port)
+	}
+	fs.writeFileSync(path.join(lock, "owner"), String(process.pid))
+	return true
+}
+
 // An emulator takes a console port and the one after it; ports from 5600 keep clear of Android Studio's 5554 on.
 export const freePort = async (from = 5600): Promise<number> => {
 	for (let port = from; port < 5900; port += 2) {
-		if ((await portFree(port)) && (await portFree(port + 1))) {
-			return port
+		if (reservePort(port)) {
+			if ((await portFree(port)) && (await portFree(port + 1))) {
+				return port
+			}
+			fs.rmSync(portLockOf(port), { recursive: true, force: true })
 		}
 	}
 	throw new Error("No free port pair for an emulator between 5600 and 5900")
@@ -62,7 +87,7 @@ export const bootEmulator = (
 	options: { window: boolean; logFile: string; snapshot?: string; writable?: boolean },
 ): ChildProcess => {
 	const log = fs.openSync(options.logFile, "a")
-	return spawn(
+	const emulator = spawn(
 		sdk.emulator,
 		[
 			"-avd",
@@ -81,6 +106,11 @@ export const bootEmulator = (
 		// A headless one outlives the runner that boots it, for the next render; the CLI stops it when it ends.
 		{ env: sdkEnv(sdk), detached: !options.window, stdio: ["ignore", log, log] },
 	)
+	// The port stays reserved for as long as the emulator runs.
+	if (emulator.pid && fs.existsSync(portLockOf(port))) {
+		fs.writeFileSync(path.join(portLockOf(port), "owner"), String(emulator.pid))
+	}
+	return emulator
 }
 
 export const waitForBoot = async (sdk: AndroidSdk, serial: string, emulator?: ChildProcess) => {
