@@ -84,6 +84,9 @@ export type NativeHost = {
 	launch: (plan: string, options: HostLaunchOptions) => HostLaunch
 	// How many host processes can run at once, when fewer than the CLI would start (one emulator each).
 	concurrency?: number
+	// Hand the host Hermes bytecode rather than JavaScript, when compiling once beats its Hermes compiling the
+	// source at every process start.
+	bytecode?: boolean
 }
 
 export type RendererContext = {

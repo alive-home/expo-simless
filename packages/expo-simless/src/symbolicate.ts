@@ -2,7 +2,7 @@ import fs from "node:fs"
 import { SourceMap } from "node:module"
 import path from "node:path"
 
-const FRAME = /^\s*at (.*?) \(?(\S+\.jsbundle):(\d+):(\d+)\)?$/
+const FRAME = /^\s*at (.*?) \(?(?:address at )?(\S+\.jsbundle):(\d+):(\d+)\)?$/
 // The runtime's own frames and React's internals say nothing about the component that failed.
 const NOISE =
 	/^(react|react-native|@react-native|scheduler)\/|^\.cache\/simless\/|metroRequire|guardedLoadModule|loadModuleImplementation/
@@ -17,9 +17,18 @@ const tryLoad = (sourceMapPath: string): SourceMap | null => {
 }
 
 // Rewrites `at fn (…/main.jsbundle:123:45)` frames to the project's source files, drops the noise, and keeps
-// the message and any component stack React appended.
-export const symbolicator = (sourceMapPath: string, projectRoot: string) => {
+// the message and any component stack React appended. A bytecode bundle's frames are bytecode offsets, which its
+// own map takes back to the JavaScript first.
+export const symbolicator = (sourceMapPath: string, projectRoot: string, bytecodeMapPath?: string) => {
 	const map = tryLoad(sourceMapPath)
+	const bytecodeMap = bytecodeMapPath ? tryLoad(bytecodeMapPath) : null
+	const findOrigin = (line: number, column: number): ReturnType<SourceMap["findOrigin"]> => {
+		if (!bytecodeMap) {
+			return map?.findOrigin(line, column) ?? {}
+		}
+		const source = bytecodeMap.findOrigin(line, column)
+		return "lineNumber" in source ? (map?.findOrigin(source.lineNumber, source.columnNumber) ?? {}) : {}
+	}
 	// Expo writes sources relative to its server root behind a run of `../`, so the prefix is unreliable; the
 	// rest of the path is matched against the project root and each directory above it.
 	const bases: string[] = []
@@ -58,7 +67,7 @@ export const symbolicator = (sourceMapPath: string, projectRoot: string) => {
 				out.push(line)
 				continue
 			}
-			const origin = map.findOrigin(Number(frame[3]), Number(frame[4]))
+			const origin = findOrigin(Number(frame[3]), Number(frame[4]))
 			if (!("fileName" in origin)) {
 				skipped += 1
 				continue
