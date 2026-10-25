@@ -78,36 +78,47 @@ const alive = (pid: number) => {
 	}
 }
 
-// One emulator per slot; a slot is held by the runner that made its lock directory, until it ends.
-const acquireSlot = async (pool: string, count: number) => {
+const readState = (file: string): SlotState | null => {
+	try {
+		return JSON.parse(fs.readFileSync(file, "utf8")) as SlotState
+	} catch {
+		return null
+	}
+}
+
+const tryLock = (pool: string, index: number) => {
+	const lock = path.join(pool, `slot-${index}.lock`)
+	try {
+		fs.mkdirSync(lock)
+		fs.writeFileSync(path.join(lock, "owner"), String(process.pid))
+		return { index, release: () => fs.rmSync(lock, { recursive: true, force: true }) }
+	} catch {
+		// A runner the CLI killed on its timeout leaves its lock behind.
+		const owner = Number(fs.readFileSync(path.join(lock, "owner"), { encoding: "utf8", flag: "a+" }) || 0)
+		if (owner > 0 && !alive(owner)) {
+			fs.rmSync(lock, { recursive: true, force: true })
+		}
+		return null
+	}
+}
+
+// One emulator per slot; a slot is held by the runner that made its lock directory, until it ends. A free one
+// already showing the plan's display comes first: the first switch to a display costs an emulator seconds.
+const acquireSlot = async (pool: string, count: number, display: string) => {
 	const started = Date.now()
+	const slots = Array.from({ length: count }, (_, index) => index)
 	for (;;) {
-		for (let index = 0; index < count; index += 1) {
-			const lock = path.join(pool, `slot-${index}.lock`)
-			try {
-				fs.mkdirSync(lock)
-				fs.writeFileSync(path.join(lock, "owner"), String(process.pid))
-				return { index, release: () => fs.rmSync(lock, { recursive: true, force: true }) }
-			} catch {
-				// A runner the CLI killed on its timeout leaves its lock behind.
-				const owner = Number(fs.readFileSync(path.join(lock, "owner"), { encoding: "utf8", flag: "a+" }) || 0)
-				if (owner > 0 && !alive(owner)) {
-					fs.rmSync(lock, { recursive: true, force: true })
-				}
+		const showing = slots.filter((index) => readState(path.join(pool, `slot-${index}.json`))?.display === display)
+		for (const index of [...showing, ...slots.filter((index) => !showing.includes(index))]) {
+			const slot = tryLock(pool, index)
+			if (slot) {
+				return slot
 			}
 		}
 		if (Date.now() - started > SLOT_WAIT_MS) {
 			throw new Error(`no emulator came free in ${SLOT_WAIT_MS / 1000}s`)
 		}
 		await sleep(150)
-	}
-}
-
-const readState = (file: string): SlotState | null => {
-	try {
-		return JSON.parse(fs.readFileSync(file, "utf8")) as SlotState
-	} catch {
-		return null
 	}
 }
 
@@ -184,8 +195,8 @@ const pushOnce = async (config: RunnerConfig, state: SlotState, local: string, p
 	return remote
 }
 
-// The device as the plan's device and appearance: one emulator plays every preset.
-const configureDisplay = async (config: RunnerConfig, state: SlotState, plan: Plan) => {
+// The plan's device and appearance as the emulator shows them: one emulator plays every preset.
+const displayOf = (plan: Plan) => {
 	const panel = panelOf({
 		name: "",
 		width: plan.template.width,
@@ -195,14 +206,17 @@ const configureDisplay = async (config: RunnerConfig, state: SlotState, plan: Pl
 		cornerRadius: 0,
 	})
 	const night = plan.template.appearance === "dark" ? "yes" : "no"
-	const display = `${panel.widthPx}x${panel.heightPx}@${panel.dpi}/${night}`
-	if (state.display !== display) {
-		await shell(
-			config.sdk,
-			state.serial,
-			`wm size ${panel.widthPx}x${panel.heightPx}; wm density ${panel.dpi}; cmd uimode night ${night}`,
-		)
-		state.display = display
+	return {
+		key: `${panel.widthPx}x${panel.heightPx}@${panel.dpi}/${night}`,
+		command: `wm size ${panel.widthPx}x${panel.heightPx}; wm density ${panel.dpi}; cmd uimode night ${night}`,
+	}
+}
+
+const configureDisplay = async (config: RunnerConfig, state: SlotState, plan: Plan) => {
+	const display = displayOf(plan)
+	if (state.display !== display.key) {
+		await shell(config.sdk, state.serial, display.command)
+		state.display = display.key
 	}
 	if (config.timeZone && state.timeZone !== config.timeZone) {
 		await shell(config.sdk, state.serial, `cmd alarm set-timezone ${config.timeZone}`)
@@ -312,7 +326,7 @@ const stepTimer = (verbose: boolean) => {
 
 const runOnPool = async (config: RunnerConfig, plan: Plan) => {
 	const step = stepTimer(Boolean(plan.verbose))
-	const slot = await acquireSlot(config.pool, config.emulators)
+	const slot = await acquireSlot(config.pool, config.emulators, displayOf(plan).key)
 	step(`slot ${slot.index}`)
 	const stateFile = path.join(config.pool, `slot-${slot.index}.json`)
 	let state = readState(stateFile)
