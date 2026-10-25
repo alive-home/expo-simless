@@ -53,8 +53,10 @@ type ProcessResult = {
 	error?: string
 }
 
-// Bundle load, the first frame and the script's own setup, on top of each render's timeout.
-const STARTUP_ALLOWANCE_MS = 30_000
+// Bundle load, the first frame and the script's own setup, on top of each render's timeout. Each render's timeout is
+// the host's own, which reports it as a failed render; this limit only ends a host that hangs, so it allows for a Mac
+// busy with other builds and emulators, where a host can take a minute to start.
+const STARTUP_ALLOWANCE_MS = 120_000
 // A shared process performs an unknown number of renders; this is only there to end a script that hangs.
 const SHARED_PROCESS_LIMIT_MS = 30 * 60_000
 // How long a host that says when it is ready (an Android runner waiting for an emulator) may take to get there.
